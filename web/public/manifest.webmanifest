@@ -1,0 +1,28 @@
+{
+  "name": "Chaukas · Private scam shield",
+  "short_name": "Chaukas",
+  "description": "Check suspicious messages privately on your device with Gemini Nano, with a redacted cloud fallback.",
+  "start_url": "/#/check",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fbf8f4",
+  "theme_color": "#fbf8f4",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "share_target": {
+    "action": "/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [{ "name": "image", "accept": ["image/*"] }]
+    }
+  },
+  "shortcuts": [
+    { "name": "Check a message", "url": "/#/check" },
+    { "name": "Scam Dojo", "url": "/#/dojo" }
+  ]
+}

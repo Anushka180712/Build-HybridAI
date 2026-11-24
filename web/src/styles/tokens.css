@@ -1,0 +1,112 @@
+:root {
+  color-scheme: light;
+
+  /* Neutrals: warm paper, never pure white backgrounds or pure black text */
+  --paper: #fbf8f4;
+  --paper-2: #f6f2ec;
+  --surface: #ffffff;
+  --ink: #24212c;
+  --ink-2: #565266;
+  --ink-3: #8b8799;
+  --ink-4: #b3afbf;
+  --line: #ede8e1;
+  --line-2: #e3ddd4;
+
+  /* Pastel families: 50/100 for fills, 300 for borders, 600/700 for text */
+  /* Brand: peacock teal. Calm and trustworthy, easy to tell apart from the red/amber/green verdicts. */
+  --brand-50: #eef7f6;
+  --brand-100: #d8eeeb;
+  --brand-200: #bfe2dd;
+  --brand-300: #8fcac2;
+  --brand-500: #24857c;
+  --brand-600: #1b6f68;
+  --brand-700: #145651;
+
+  --mint-50: #f0faf4;
+  --mint-100: #dcf3e6;
+  --mint-300: #a6dcbe;
+  --mint-600: #2f8a5c;
+  --mint-700: #226b47;
+
+  --butter-50: #fffaeb;
+  --butter-100: #fff0c7;
+  --butter-300: #f5d68a;
+  --butter-600: #b07b0c;
+  --butter-700: #845b00;
+
+  --rose-50: #fff4f2;
+  --rose-100: #ffe2dc;
+  --rose-300: #f6b3a6;
+  --rose-600: #c94b36;
+  --rose-700: #9c3524;
+
+  --sky-50: #f1f7fe;
+  --sky-100: #ddebfb;
+  --sky-300: #a9cbf0;
+  --sky-600: #3a78bf;
+
+  --peach-100: #ffe8d4;
+
+  /* Type */
+  /* Hind is designed in India for Latin and Indian scripts, so Hindi, Bengali, Tamil and Telugu
+     answers sit in the same type family as the English around them. */
+  --font-sans: 'Hind', 'Hind Siliguri', 'Hind Madurai', 'Hind Guntur', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-md: 0.9375rem;
+  --fs-lg: 1.0625rem;
+  --fs-xl: 1.375rem;
+  --fs-2xl: 1.875rem;
+  --fs-3xl: clamp(2rem, 1.4rem + 2.2vw, 2.875rem);
+
+  /* Space (4pt grid) */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 48px;
+
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --r-xl: 24px;
+  --r-pill: 999px;
+
+  --shadow-1: 0 1px 0 rgba(36, 33, 44, 0.04), 0 1px 3px rgba(36, 33, 44, 0.04);
+  --shadow-2: 0 1px 0 rgba(36, 33, 44, 0.03), 0 6px 20px -8px rgba(30, 60, 58, 0.14);
+  --shadow-3: 0 20px 50px -20px rgba(60, 45, 120, 0.28);
+  --ring: 0 0 0 3px var(--brand-200);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-1: 120ms;
+  --dur-2: 220ms;
+  --dur-3: 420ms;
+
+  --sidebar-w: 256px;
+}
+
+:root[data-large-text='true'] {
+  font-size: 112.5%;
+}
+
+:root[data-reduce-motion='true'] *,
+:root[data-reduce-motion='true'] *::before,
+:root[data-reduce-motion='true'] *::after {
+  animation-duration: 1ms !important;
+  transition-duration: 1ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}

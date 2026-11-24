@@ -1,0 +1,33 @@
+{
+  "parameters": {
+    "cloud_model": {
+      "defaultValue": { "value": "gemini-3.5-flash-lite" },
+      "description": "Cloud model used by Firebase AI Logic when inference runs in the cloud.",
+      "valueType": "STRING"
+    },
+    "second_opinion_min": {
+      "defaultValue": { "value": "35" },
+      "description": "Lower bound of the risk band where Chaukas suggests a cloud second opinion.",
+      "valueType": "NUMBER"
+    },
+    "second_opinion_max": {
+      "defaultValue": { "value": "70" },
+      "description": "Upper bound of the risk band where Chaukas suggests a cloud second opinion.",
+      "valueType": "NUMBER"
+    },
+    "trend_banner": {
+      "defaultValue": { "value": "Scam wave: fake electricity-bill and KYC \"update\" texts are spiking. Never pay or share an OTP through a texted link." },
+      "description": "Short alert about a current scam wave. Empty hides the banner.",
+      "valueType": "STRING"
+    },
+    "trend_banner_link": {
+      "defaultValue": { "value": "https://sancharsaathi.gov.in/sfc/" },
+      "valueType": "STRING"
+    },
+    "dojo_enabled": {
+      "defaultValue": { "value": "true" },
+      "description": "Turns the Scam Dojo practice mode on or off.",
+      "valueType": "BOOLEAN"
+    }
+  }
+}
