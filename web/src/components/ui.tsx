@@ -84,12 +84,13 @@ export function SwitchRow({ title, hint, checked, onChange }: { title: string; h
 
 /* ---------------- Source badge ---------------- */
 export function SourceBadge({ source, latencyMs }: { source: string; latencyMs?: number }) {
+  const t = useT();
   const cls = source === 'on_device' ? 'device' : source === 'in_cloud' ? 'cloud' : 'preview';
   const icon: IconName = source === 'on_device' ? 'laptop' : source === 'in_cloud' ? 'cloud' : 'eye';
   return (
     <span className={`badge ${cls}`} title={source === 'on_device' ? 'Answered by Gemini Nano, running locally in your browser' : source === 'in_cloud' ? 'Answered by Gemini via Firebase AI Logic' : 'Preview mode: local pattern checks only'}>
       <Icon name={icon} />
-      {sourceLabel(source)}
+      {t(sourceLabel(source))}
       {latencyMs !== undefined && <span className="mono" style={{ opacity: 0.75 }}>· {latencyMs < 1000 ? `${latencyMs} ms` : `${(latencyMs / 1000).toFixed(1)} s`}</span>}
     </span>
   );

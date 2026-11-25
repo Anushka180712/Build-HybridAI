@@ -1082,7 +1082,7 @@ private fun ResultView(
                 Dial(a.riskScore, fg)
                 Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
-                    Pill(categoryLabel(a.category), border, fg, if (a.verdict == Verdict.SCAM) Icons.Outlined.Shield else Icons.Outlined.VerifiedUser)
+                    Pill(categoryLabel(a.category, vm.language), border, fg, if (a.verdict == Verdict.SCAM) Icons.Outlined.Shield else Icons.Outlined.VerifiedUser)
                     Spacer(Modifier.height(6.dp))
                     Text(a.verdict.label, style = MaterialTheme.typography.headlineSmall, color = fg)
                     val regional = RegionalVerdict.forVerdict(vm.language, a.verdict)
@@ -2586,12 +2586,12 @@ private fun CircleFeed(circle: Circle, myUid: String, language: String = "Englis
                         Avatar(alert.byName, size = 34.dp)
                         Spacer(Modifier.width(10.dp))
                         Column {
-                            Text(if (alert.byUid == myUid) "You" else alert.byName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text(if (alert.byUid == myUid) I18n.t("You", language) else alert.byName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             Text(timeAgo(alert.createdAt), fontSize = 11.sp, color = Chaukas.Ink3)
                         }
                     }
                     Pill(
-                        "${if (isScam) "Likely scam" else "Be careful"} · ${alert.riskScore}",
+                        "${I18n.t(if (isScam) "Likely scam" else "Be careful", language)} · ${alert.riskScore}",
                         if (isScam) Chaukas.Rose100 else Chaukas.Butter100,
                         if (isScam) Chaukas.Rose700 else Chaukas.Butter700,
                     )
@@ -2620,7 +2620,7 @@ private fun CircleFeed(circle: Circle, myUid: String, language: String = "Englis
                 }
 
                 Spacer(Modifier.height(6.dp))
-                Text("${categoryLabel(alert.category)}. ${alert.summary}", fontSize = 13.sp, color = Chaukas.Ink2)
+                Text("${categoryLabel(alert.category, language)}. ${alert.summary}", fontSize = 13.sp, color = Chaukas.Ink2)
 
                 Spacer(Modifier.height(10.dp))
                 // Reactions row: got, scam, seen, call, love
@@ -2654,7 +2654,7 @@ private fun CircleFeed(circle: Circle, myUid: String, language: String = "Englis
                             ) {
                                 Icon(icon, null, modifier = Modifier.size(13.dp), tint = if (mine) Chaukas.Brand700 else Chaukas.Ink2)
                                 Spacer(Modifier.width(4.dp))
-                                Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = if (mine) Chaukas.Brand700 else Chaukas.Ink2)
+                                Text(I18n.t(label, language), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = if (mine) Chaukas.Brand700 else Chaukas.Ink2)
                                 if (count > 0) {
                                     Spacer(Modifier.width(4.dp))
                                     Text("$count", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Chaukas.Ink)
@@ -2690,7 +2690,7 @@ private fun CircleFeed(circle: Circle, myUid: String, language: String = "Englis
                         ) {
                             Icon(Icons.Outlined.Share, null, modifier = Modifier.size(13.dp), tint = Chaukas.Ink2)
                             Spacer(Modifier.width(4.dp))
-                            Text("Share", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Chaukas.Ink2)
+                            Text(I18n.t("Share", language), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Chaukas.Ink2)
                         }
                     }
                 }
@@ -3360,7 +3360,7 @@ private fun HistoryScreen(vm: ChaukasViewModel, onCheck: () -> Unit) {
         }
 
         if (state.runs.size >= 2) {
-            HistoryInsightsCard(state.runs)
+            HistoryInsightsCard(state.runs, vm.language)
         }
 
         // Filter chips
@@ -3416,13 +3416,13 @@ private fun HistoryScreen(vm: ChaukasViewModel, onCheck: () -> Unit) {
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(r.analysis.verdict.label, fontWeight = FontWeight.SemiBold)
-                                    Text(" · ${categoryLabel(r.analysis.category)}", color = Chaukas.Ink3, fontSize = 12.sp, maxLines = 1)
+                                    Text(I18n.t(r.analysis.verdict.label, vm.language), fontWeight = FontWeight.SemiBold)
+                                    Text(" · ${categoryLabel(r.analysis.category, vm.language)}", color = Chaukas.Ink3, fontSize = 12.sp, maxLines = 1)
                                 }
                                 Text(excerpt(r.input, 110), color = Chaukas.Ink2, fontSize = 13.sp, maxLines = 1)
                             }
                             Column(horizontalAlignment = Alignment.End) {
-                                SourcePill(r.source.wire)
+                                SourcePill(r.source.wire, vm.language)
                                 Text(timeAgo(r.createdAt), color = Chaukas.Ink3, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
                             }
                         }
@@ -3435,20 +3435,20 @@ private fun HistoryScreen(vm: ChaukasViewModel, onCheck: () -> Unit) {
         }
 
         if (otherDevices.isNotEmpty()) {
-            Text("From your other devices", color = Chaukas.Ink2, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
-            otherDevices.forEach { s -> SyncedRow(s) }
+            Text(I18n.t("From your other devices", vm.language), color = Chaukas.Ink2, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
+            otherDevices.forEach { s -> SyncedRow(s, vm.language) }
         }
     }
 
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text("Clear history") },
-            text = { Text("Delete all checks stored on this device? Totals will be kept.") },
+            title = { Text(I18n.t("Clear history", vm.language)) },
+            text = { Text(I18n.t("Delete all checks stored on this device? Totals will be kept.", vm.language)) },
             confirmButton = {
-                TextButton(onClick = { vm.clearHistory(); confirmClear = false }, colors = ButtonDefaults.textButtonColors(contentColor = Chaukas.Rose700)) { Text("Delete") }
+                TextButton(onClick = { vm.clearHistory(); confirmClear = false }, colors = ButtonDefaults.textButtonColors(contentColor = Chaukas.Rose700)) { Text(I18n.t("Delete", vm.language)) }
             },
-            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(I18n.t("Cancel", vm.language)) } },
         )
     }
 }
@@ -3468,17 +3468,17 @@ private fun HistoryStat(label: String, value: String, bg: Color, fg: Color, modi
 }
 
 @Composable
-private fun SourcePill(source: String) {
+private fun SourcePill(source: String, language: String = "English") {
     val (bg, fg) = when (source) {
         "on_device" -> Chaukas.Mint100 to Chaukas.Mint700
         "in_cloud" -> Chaukas.Sky100 to Chaukas.Sky600
         else -> Chaukas.Butter100 to Chaukas.Butter700
     }
-    Text(sourceLabel(source), color = fg, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clip(CircleShape).background(bg).padding(horizontal = 8.dp, vertical = 2.dp))
+    Text(I18n.t(sourceLabel(source), language), color = fg, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clip(CircleShape).background(bg).padding(horizontal = 8.dp, vertical = 2.dp))
 }
 
 @Composable
-private fun SyncedRow(s: SyncedCheck) {
+private fun SyncedRow(s: SyncedCheck, language: String = "English") {
     val (bg, fg) = scoreColors(s.verdict)
     Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), color = Chaukas.Surface, border = BorderStroke(1.dp, Chaukas.Line)) {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -3491,7 +3491,7 @@ private fun SyncedRow(s: SyncedCheck) {
                 Text(s.excerpt, color = Chaukas.Ink2, fontSize = 13.sp, maxLines = 1)
             }
             Column(horizontalAlignment = Alignment.End) {
-                SourcePill(s.source)
+                SourcePill(s.source, language)
                 Text(timeAgo(s.createdAt), color = Chaukas.Ink3, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
             }
         }
@@ -3499,11 +3499,11 @@ private fun SyncedRow(s: SyncedCheck) {
 }
 
 @Composable
-private fun HistoryInsightsCard(runs: List<AnalysisRun>) {
+private fun HistoryInsightsCard(runs: List<AnalysisRun>, language: String = "English") {
     val data = remember(runs) { historyInsights(runs) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         ChaukasCard {
-            Text("Last 7 days", style = MaterialTheme.typography.titleMedium)
+            Text(I18n.t("Last 7 days", language), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth().height(120.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                 data.days.forEach { d ->
@@ -3525,14 +3525,14 @@ private fun HistoryInsightsCard(runs: List<AnalysisRun>) {
         }
 
         ChaukasCard {
-            Text("What is targeting you", style = MaterialTheme.typography.titleMedium)
+            Text(I18n.t("What is targeting you", language), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(10.dp))
             if (data.top.isEmpty()) {
-                Text("No scams yet. Keep it that way.", color = Chaukas.Ink2, fontSize = 13.sp)
+                Text(I18n.t("No scams yet. Keep it that way.", language), color = Chaukas.Ink2, fontSize = 13.sp)
             } else {
                 data.top.forEach { (cat, n) ->
                     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(categoryLabel(cat), fontSize = 13.sp, modifier = Modifier.width(130.dp), maxLines = 1)
+                        Text(categoryLabel(cat, language), fontSize = 13.sp, modifier = Modifier.width(130.dp), maxLines = 1)
                         Box(Modifier.weight(1f).height(10.dp).clip(CircleShape).background(Chaukas.Rose50)) {
                             Box(Modifier.fillMaxHeight().fillMaxWidth(n / data.catMax.toFloat()).clip(CircleShape).background(Chaukas.Rose300))
                         }
@@ -4178,14 +4178,14 @@ private fun DojoScreen(vm: ChaukasViewModel) {
 @Composable
 private fun EngineScreen(vm: ChaukasViewModel) {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Eyebrow("Under the hood")
-        Text("Engine", style = MaterialTheme.typography.displaySmall)
+        Eyebrow(I18n.t("Under the hood", vm.language))
+        Text(I18n.t("Engine", vm.language), style = MaterialTheme.typography.displaySmall)
         val (title, body, color) = when (val s = vm.modelState) {
-            ModelState.Checking -> Triple("Checking…", "Asking AICore about Gemini Nano.", Chaukas.Sky100)
-            ModelState.Available -> Triple("Gemini Nano is ready", "Checks run on this phone, privately, even offline.", Chaukas.Mint100)
-            ModelState.Downloadable -> Triple("Ready to download", "Download Gemini Nano once. It is shared with other apps through AICore.", Chaukas.Butter100)
-            is ModelState.Downloading -> Triple("Downloading… ${s.fraction?.let { "${(it * 100).toInt()}%" } ?: ""}", "Smart mode uses the cloud with redaction until it finishes.", Chaukas.Sky100)
-            ModelState.Unavailable -> Triple("Not available on this phone", "Chaukas will use the cloud with personal details removed.", Chaukas.Rose100)
+            ModelState.Checking -> Triple(I18n.t("Checking…", vm.language), I18n.t("Asking AICore about Gemini Nano.", vm.language), Chaukas.Sky100)
+            ModelState.Available -> Triple(I18n.t("Gemini Nano is ready", vm.language), I18n.t("Checks run on this phone, privately, even offline.", vm.language), Chaukas.Mint100)
+            ModelState.Downloadable -> Triple(I18n.t("Ready to download", vm.language), I18n.t("Download Gemini Nano once. It is shared with other apps through AICore.", vm.language), Chaukas.Butter100)
+            is ModelState.Downloading -> Triple(I18n.t("Downloading Gemini Nano…", vm.language) + (s.fraction?.let { " ${(it * 100).toInt()}%" } ?: ""), I18n.t("Smart mode uses the cloud with redaction until it finishes.", vm.language), Chaukas.Sky100)
+            ModelState.Unavailable -> Triple(I18n.t("Not available on this phone", vm.language), I18n.t("Chaukas will use the cloud with personal details removed.", vm.language), Chaukas.Rose100)
         }
         ChaukasCard(color = color) {
             Text(title, style = MaterialTheme.typography.headlineSmall)
@@ -4196,16 +4196,16 @@ private fun EngineScreen(vm: ChaukasViewModel) {
             }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (vm.modelState == ModelState.Downloadable) Button(onClick = { vm.download() }) { Text("Download Gemini Nano") }
-                OutlinedButton(onClick = { vm.refreshModel() }) { Text("Re-check") }
+                if (vm.modelState == ModelState.Downloadable) Button(onClick = { vm.download() }) { Text(I18n.t("Download Gemini Nano", vm.language)) }
+                OutlinedButton(onClick = { vm.refreshModel() }) { Text(I18n.t("Re-check", vm.language)) }
             }
         }
         ChaukasCard {
-            Text("Privacy", style = MaterialTheme.typography.titleMedium)
+            Text(I18n.t("Privacy", vm.language), style = MaterialTheme.typography.titleMedium)
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
                 Column(Modifier.weight(1f)) {
-                    Text("Remove personal details before using the cloud")
-                    Text("Numbers, emails, cards and codes are swapped for placeholders on your phone.", color = Chaukas.Ink3, fontSize = 12.sp)
+                    Text(I18n.t("Remove personal details before using the cloud", vm.language))
+                    Text(I18n.t("Numbers, emails, cards and codes are swapped for placeholders on your phone.", vm.language), color = Chaukas.Ink3, fontSize = 12.sp)
                 }
                 Switch(vm.redact, { vm.redact = it }, colors = SwitchDefaults.colors(checkedTrackColor = Chaukas.Brand500))
             }

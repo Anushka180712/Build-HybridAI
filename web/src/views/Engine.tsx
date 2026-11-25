@@ -12,6 +12,7 @@ import { deviceStore, downloadDeviceModel, rcStore, refreshDevice, useOnline } f
 import { Icon } from '../components/Icon';
 import { copyText } from '../components/ui';
 import { getFirebase, readAppCheckDebugToken } from '../firebase/app';
+import { useT } from '../lib/i18n';
 
 const AVAIL_COPY: Record<string, { title: string; body: string; tone: 'ok' | 'warn' | 'info' | 'err' }> = {
   checking: { title: 'Checking…', body: 'Asking Chrome about its built-in model.', tone: 'info' },
@@ -23,6 +24,7 @@ const AVAIL_COPY: Record<string, { title: string; body: string; tone: 'ok' | 'wa
 };
 
 export function EngineView() {
+  const t = useT();
   const device = deviceStore.use();
   const rc = rcStore.use();
   const { runs } = historyStore.use();
@@ -58,23 +60,23 @@ export function EngineView() {
     <div className="page">
       <header className="page-head">
         <div>
-          <span className="eyebrow">Under the hood</span>
-          <h1 className="display page-title">Engine</h1>
+          <span className="eyebrow">{t('Under the hood')}</span>
+          <h1 className="display page-title">{t('Engine')}</h1>
         </div>
         <span className={`badge ${online ? 'device' : 'preview'}`}>
-          <Icon name={online ? 'bolt' : 'wifiOff'} /> {online ? 'Online' : 'Offline'}
+          <Icon name={online ? 'bolt' : 'wifiOff'} /> {online ? t('Online') : t('Offline')}
         </span>
       </header>
 
       {debugToken && (
         <section className="card card-pad callout warn debug-token">
           <div className="grow">
-            <b>App Check debug token for this browser</b>
-            <p className="xs subtle">Debug mode is on. Add this token in the Firebase console (App Check → Apps → your web app → ⋮ → Manage debug tokens) so cloud checks work here.</p>
+            <b>{t('App Check debug token for this browser')}</b>
+            <p className="xs subtle">{t('Debug mode is on. Add this token in the Firebase console (App Check → Apps → your web app → ⋮ → Manage debug tokens) so cloud checks work here.')}</p>
             <code className="mono debug-token-value">{debugToken}</code>
           </div>
           <button className="btn soft sm" onClick={() => copyText(debugToken, 'Token copied')}>
-            <Icon name="copy" /> Copy
+            <Icon name="copy" /> {t('Copy')}
           </button>
         </section>
       )}
@@ -84,9 +86,9 @@ export function EngineView() {
           <Icon name="chip" />
         </div>
         <div className="grow stack" style={{ gap: 6 }}>
-          <span className="eyebrow">On-device model · {browserLabel()}</span>
-          <h2 className="display" style={{ fontSize: 'var(--fs-2xl)' }}>{a.title}</h2>
-          <p className="muted">{a.body}</p>
+          <span className="eyebrow">{t('On-device model')} · {browserLabel()}</span>
+          <h2 className="display" style={{ fontSize: 'var(--fs-2xl)' }}>{t(a.title)}</h2>
+          <p className="muted">{t(a.body)}</p>
           {pct !== null && (
             <div style={{ marginTop: 8 }}>
               <div className="progress"><i style={{ width: `${pct}%` }} /></div>
@@ -97,59 +99,59 @@ export function EngineView() {
           <div className="row wrap" style={{ marginTop: 10 }}>
             {(device.availability === 'downloadable' || device.availability === 'downloading') && (
               <button className="btn lilac" onClick={downloadDeviceModel} disabled={pct !== null && pct < 100}>
-                <Icon name="download" /> {device.availability === 'downloading' ? 'Resume download' : 'Download Gemini Nano'}
+                <Icon name="download" /> {device.availability === 'downloading' ? t('Resume download') : t('Download Gemini Nano')}
               </button>
             )}
-            <button className="btn ghost" onClick={refreshDevice}>Re-check</button>
+            <button className="btn ghost" onClick={refreshDevice}>{t('Re-check')}</button>
           </div>
         </div>
       </section>
 
       <section className="card card-pad">
         <div className="card-head">
-          <h3 className="card-title"><span className="ic"><Icon name="arrowRight" /></span>How your message is routed</h3>
-          <span className="badge lilac">Mode: {mode === 'private' ? 'Private' : mode === 'smart' ? 'Smart' : 'Most accurate'}</span>
+          <h3 className="card-title"><span className="ic"><Icon name="arrowRight" /></span>{t('How your message is routed')}</h3>
+          <span className="badge lilac">{t('Mode:')} {mode === 'private' ? t('Private') : mode === 'smart' ? t('Smart') : t('Most accurate')}</span>
         </div>
         <Flow mode={mode} deviceReady={device.availability === 'available'} />
       </section>
 
       <div className="engine-grid">
         <section className="card card-pad">
-          <h3 className="card-title" style={{ marginBottom: 14 }}><span className="ic mint"><Icon name="bolt" /></span>Your speed</h3>
+          <h3 className="card-title" style={{ marginBottom: 14 }}><span className="ic mint"><Icon name="bolt" /></span>{t('Your speed')}</h3>
           <div className="perf">
             <div className="perf-col t-mint">
-              <span className="xs subtle">On device</span>
+              <span className="xs subtle">{t('On device')}</span>
               <span className="display">{perf.device.ms !== null ? `${perf.device.ms}` : '–'}<small>ms</small></span>
-              <span className="xs subtle">{perf.device.n} checks</span>
+              <span className="xs subtle">{perf.device.n} {t('checks')}</span>
             </div>
             <div className="perf-col t-sky">
-              <span className="xs subtle">Cloud</span>
+              <span className="xs subtle">{t('Cloud')}</span>
               <span className="display">{perf.cloud.ms !== null ? `${perf.cloud.ms}` : '–'}<small>ms</small></span>
-              <span className="xs subtle">{perf.cloud.n} checks</span>
+              <span className="xs subtle">{perf.cloud.n} {t('checks')}</span>
             </div>
           </div>
         </section>
 
         <section className="card card-pad">
-          <h3 className="card-title" style={{ marginBottom: 14 }}><span className="ic"><Icon name="settings" /></span>Firebase services</h3>
+          <h3 className="card-title" style={{ marginBottom: 14 }}><span className="ic"><Icon name="settings" /></span>{t('Firebase services')}</h3>
           <ul className="svc">
-            <Svc ok={!isPreviewEngine()} name="AI Logic (hybrid)" detail={isPreviewEngine() ? 'Preview mode, no config' : `Cloud model: ${rc.cloudModel}`} />
-            <Svc ok={isFirebaseConfigured && (appCheckDebug || Boolean(recaptchaSiteKey))} name="App Check" detail={recaptchaSiteKey ? 'reCAPTCHA Enterprise' : appCheckDebug ? 'Debug token' : 'Not configured'} />
-            <Svc ok={rc.loaded && isFirebaseConfigured} name="Remote Config" detail={rc.loaded && isFirebaseConfigured ? 'Live values' : 'Using built-in defaults'} />
-            <Svc ok={isFirebaseConfigured} name="Auth + Firestore" detail={isFirebaseConfigured ? 'Family Circle and sync' : 'Off'} />
+            <Svc ok={!isPreviewEngine()} name={t('AI Logic (hybrid)')} detail={isPreviewEngine() ? t('Preview mode, no config') : `${t('Cloud')}: ${rc.cloudModel}`} />
+            <Svc ok={isFirebaseConfigured && (appCheckDebug || Boolean(recaptchaSiteKey))} name={t('App Check')} detail={recaptchaSiteKey ? 'reCAPTCHA Enterprise' : appCheckDebug ? 'Debug token' : 'Not configured'} />
+            <Svc ok={rc.loaded && isFirebaseConfigured} name={t('Remote Config')} detail={rc.loaded && isFirebaseConfigured ? t('Live values') : t('Using built-in defaults')} />
+            <Svc ok={isFirebaseConfigured} name={t('Auth + Firestore')} detail={isFirebaseConfigured ? t('Family Circle and sync') : t('Off')} />
           </ul>
         </section>
       </div>
 
       <section className="card card-pad">
-        <h3 className="card-title" style={{ marginBottom: 6 }}><span className="ic peach"><Icon name="wand" /></span>Turn on Gemini Nano in Chrome</h3>
-        <p className="muted small" style={{ marginBottom: 14 }}>One-time setup for developers and judges running locally.</p>
+        <h3 className="card-title" style={{ marginBottom: 6 }}><span className="ic peach"><Icon name="wand" /></span>{t('Turn on Gemini Nano in Chrome')}</h3>
+        <p className="muted small" style={{ marginBottom: 14 }}>{t('One-time setup for developers and judges running locally.')}</p>
         <ol className="setup">
-          <li>Use <b>Chrome 139 or newer</b> on Windows, macOS, Linux or ChromeOS with at least 22 GB free disk space.</li>
+          <li>{t('Use Chrome 139 or newer on Windows, macOS, Linux or ChromeOS with at least 22 GB free disk space.')}</li>
           <li>
             Open <FlagLink href="chrome://flags/#prompt-api-for-gemini-nano-multimodal-input" /> and set it to <b>Enabled</b>.
           </li>
-          <li>Restart Chrome, come back here and press <b>Download Gemini Nano</b>.</li>
+          <li>{t('Restart Chrome, come back here and press Download Gemini Nano.')}</li>
           <li>Optional: check from DevTools with <code>await LanguageModel.availability()</code>.</li>
         </ol>
       </section>
@@ -178,45 +180,46 @@ function Svc({ ok, name, detail }: { ok: boolean; name: string; detail: string }
 }
 
 function Flow({ mode, deviceReady }: { mode: string; deviceReady: boolean }) {
+  const t = useT();
   const localActive = mode !== 'cloud' && deviceReady;
   const cloudActive = mode === 'cloud' || (mode === 'smart' && !deviceReady);
   return (
     <div className="flow">
       <div className="flow-node">
         <Icon name="message" />
-        <b>Your message</b>
-        <span className="xs subtle">+ instant pattern checks</span>
+        <b>{t('Your message')}</b>
+        <span className="xs subtle">{t('+ instant pattern checks')}</span>
       </div>
       <div className="flow-split">
         <div className={`flow-lane ${localActive ? 'on' : ''}`}>
           <span className="flow-line" />
           <div className="flow-node t-mint">
             <Icon name="laptop" />
-            <b>Gemini Nano</b>
-            <span className="xs subtle">in Chrome, private</span>
+            <b>{t('Gemini Nano')}</b>
+            <span className="xs subtle">{t('in Chrome, private')}</span>
           </div>
         </div>
         <div className={`flow-lane ${cloudActive ? 'on' : ''} ${mode === 'private' ? 'off' : ''}`}>
           <span className="flow-line" />
           <div className="flow-node t-butter">
             <Icon name="eye" />
-            <b>Redact</b>
-            <span className="xs subtle">names, numbers, codes</span>
+            <b>{t('Redact')}</b>
+            <span className="xs subtle">{t('names, numbers, codes')}</span>
           </div>
           <span className="flow-line short" />
           <div className="flow-node t-sky">
             <Icon name="cloud" />
-            <b>Gemini in the cloud</b>
-            <span className="xs subtle">via Firebase AI Logic</span>
+            <b>{t('Gemini in the cloud')}</b>
+            <span className="xs subtle">{t('via Firebase AI Logic')}</span>
           </div>
         </div>
       </div>
       <p className="xs subtle" style={{ marginTop: 10 }}>
         {mode === 'private'
-          ? 'Private: only the on-device path is allowed (InferenceMode.ONLY_ON_DEVICE).'
+          ? t('Private: only the on-device path is allowed (InferenceMode.ONLY_ON_DEVICE).')
           : mode === 'smart'
-            ? 'Smart: on-device first, cloud fallback with redaction (InferenceMode.PREFER_ON_DEVICE).'
-            : 'Most accurate: cloud first with redaction, on-device if offline (InferenceMode.PREFER_IN_CLOUD).'}
+            ? t('Smart: on-device first, cloud fallback with redaction (InferenceMode.PREFER_ON_DEVICE).')
+            : t('Most accurate: cloud first with redaction, on-device if offline (InferenceMode.PREFER_IN_CLOUD).')}
       </p>
     </div>
   );

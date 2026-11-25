@@ -64,7 +64,10 @@ fun timeAgo(ts: Long, now: Long = System.currentTimeMillis()): String {
         .format(DateTimeFormatter.ofPattern("MMM d"))
 }
 
-fun categoryLabel(cat: String) = CATEGORY_LABEL[cat] ?: cat
+fun categoryLabel(cat: String, language: String = "English"): String {
+    val en = CATEGORY_LABEL[cat] ?: cat
+    return I18n.t(en, language)
+}
 
 fun sourceLabel(source: String) = when (source) {
     "on_device" -> "On this device"

@@ -447,18 +447,18 @@ function CircleFeed({ circle, uid }: { circle: Circle; uid: string }) {
                 <div className="row">
                   <Avatar name={a.byName} />
                   <div>
-                    <b className="small">{a.byUid === uid ? 'You' : a.byName}</b>
+                    <b className="small">{a.byUid === uid ? t('You') : a.byName}</b>
                     <div className="xs subtle">{timeAgo(a.createdAt)}</div>
                   </div>
                 </div>
                 <span className={`verdict-chip v-${a.verdict}`}>
-                  <span className={`dot ${a.verdict}`} /> {VERDICT_LABEL[a.verdict as Verdict] ?? a.verdict} · {a.riskScore}
+                  <span className={`dot ${a.verdict}`} /> {t(VERDICT_LABEL[a.verdict as Verdict] ?? a.verdict)} · {a.riskScore}
                 </span>
               </div>
               {a.note && <p className="feed-note">{a.note}</p>}
               <blockquote className="feed-quote">{a.excerpt}</blockquote>
               <p className="small muted">
-                <b>{CATEGORY_LABEL[a.category] ?? a.category}.</b> {a.summary}
+                <b>{t(CATEGORY_LABEL[a.category] ?? a.category)}.</b> {a.summary}
               </p>
               <div className="row wrap" style={{ gap: 6, marginTop: 10 }}>
                 {REACTIONS.map((r) => {
@@ -472,7 +472,7 @@ function CircleFeed({ circle, uid }: { circle: Circle; uid: string }) {
                   );
                 })}
                 <button className="chip react" onClick={() => forwardAlert(alertForwardText(a))} title="Forward this warning on WhatsApp or anywhere">
-                  <Icon name="share" /> Share
+                  <Icon name="share" /> {t('Share')}
                 </button>
               </div>
             </li>

@@ -45,7 +45,7 @@ export function HistoryView({ param }: { param?: string }) {
     return (
       <div className="page">
         <button className="btn ghost sm back" onClick={() => navigate('history')}>
-          <Icon name="arrowRight" style={{ transform: 'rotate(180deg)' }} /> All checks
+          <Icon name="arrowRight" style={{ transform: 'rotate(180deg)' }} /> {t('All checks')}
         </button>
         <Result run={open} />
       </div>
@@ -56,13 +56,13 @@ export function HistoryView({ param }: { param?: string }) {
     <div className="page">
       <header className="page-head">
         <div>
-          <span className="eyebrow">Your checks</span>
+          <span className="eyebrow">{t('Your checks')}</span>
           <h1 className="display page-title">{t('History')}</h1>
         </div>
         {runs.length > 0 && (
           <div className="row">
           <button className="btn ghost sm" onClick={() => exportCsv(runs)}>
-            <Icon name="download" /> Export
+            <Icon name="download" /> {t('Export')}
           </button>
           <button
             className="btn ghost sm danger"
@@ -70,7 +70,7 @@ export function HistoryView({ param }: { param?: string }) {
               if (confirmClear()) clearHistory();
             }}
           >
-            <Icon name="trash" /> Clear all
+            <Icon name="trash" /> {t('Clear all')}
           </button>
           </div>
         )}
@@ -79,8 +79,8 @@ export function HistoryView({ param }: { param?: string }) {
       <section className="stats">
         <Stat label={t('Messages checked')} value={stats.total} tint="lilac" />
         <Stat label={t('Scams caught')} value={stats.scams} tint="rose" />
-        <Stat label="Checked on device" value={`${stats.localPct}%`} tint="mint" />
-        <Stat label="Details kept private" value={stats.hidden} tint="butter" />
+        <Stat label={t('Checked on device')} value={`${stats.localPct}%`} tint="mint" />
+        <Stat label={t('Details kept private')} value={stats.hidden} tint="butter" />
       </section>
 
       {runs.length >= 2 && <Insights runs={runs} />}
@@ -89,7 +89,7 @@ export function HistoryView({ param }: { param?: string }) {
         {(['all', 'scam', 'suspicious', 'safe'] as Filter[]).map((f) => (
           <button key={f} className={`chip ${filter === f ? 'on' : ''}`} onClick={() => setFilter(f)}>
             {f !== 'all' && <span className={`dot ${f}`} />}
-            {f === 'all' ? 'All' : VERDICT_LABEL[f]}
+            {f === 'all' ? t('All') : t(VERDICT_LABEL[f])}
           </button>
         ))}
       </div>
@@ -97,10 +97,10 @@ export function HistoryView({ param }: { param?: string }) {
       {list.length === 0 ? (
         <div className="card empty">
           <EmptyArt />
-          <h3>Nothing here yet</h3>
-          <p className="small">Messages you check will appear here. They are stored on this device only.</p>
+          <h3>{t('Nothing here yet')}</h3>
+          <p className="small">{t('Messages you check will appear here. Stored on this phone only.')}</p>
           <button className="btn primary" style={{ marginTop: 16 }} onClick={() => navigate('check')}>
-            Check a message
+            {t('Check a message')}
           </button>
         </div>
       ) : (
@@ -111,10 +111,10 @@ export function HistoryView({ param }: { param?: string }) {
                 <span className={`h-score v-${r.analysis.verdict}`}>{r.analysis.riskScore}</span>
                 <span className="grow">
                   <span className="row" style={{ gap: 8 }}>
-                    <b>{VERDICT_LABEL[r.analysis.verdict]}</b>
-                    <span className="subtle xs">· {CATEGORY_LABEL[r.analysis.category]}</span>
+                    <b>{t(VERDICT_LABEL[r.analysis.verdict])}</b>
+                    <span className="subtle xs">· {t(CATEGORY_LABEL[r.analysis.category] ?? r.analysis.category)}</span>
                   </span>
-                  <span className="h-excerpt">{r.hasImage && !r.input ? 'Screenshot' : excerpt(r.input, 110)}</span>
+                  <span className="h-excerpt">{r.hasImage && !r.input ? t('Screenshot') : excerpt(r.input, 110)}</span>
                 </span>
                 <span className="h-meta">
                   <SourceBadge source={r.source} />
@@ -132,7 +132,7 @@ export function HistoryView({ param }: { param?: string }) {
       {otherDevices.length > 0 && (
         <>
           <h2 className="section-title">
-            <Icon name="device" /> From your other devices
+            <Icon name="device" /> {t('From your other devices')}
           </h2>
           <ul className="history-list">
             {otherDevices.map((s) => (
@@ -195,6 +195,7 @@ function exportCsv(runs: { createdAt: number; analysis: { verdict: string; riskS
 
 /** Small, private analytics computed from the checks on this device. */
 function Insights({ runs }: { runs: AnalysisRun[] }) {
+  const t = useT();
   const data = useMemo(() => {
     const cats = new Map<string, number>();
     const flags = new Map<string, number>();
@@ -223,14 +224,14 @@ function Insights({ runs }: { runs: AnalysisRun[] }) {
   return (
     <section className="insights">
       <div className="card card-pad ins-card">
-        <h3 className="card-title"><span className="ic"><Icon name="chart" /></span>Last 7 days</h3>
+        <h3 className="card-title"><span className="ic"><Icon name="chart" /></span>{t('Last 7 days')}</h3>
         <div className="ins-week" role="img" aria-label="Checks per day for the last week, by verdict">
           {data.days.map((d) => {
             const total = d.safe + d.suspicious + d.scam;
             return (
               <div key={d.start} className="ins-day">
                 <div className="ins-stack" style={{ height: `${(total / data.max) * 100}%` }}>
-                  {(['scam', 'suspicious', 'safe'] as Verdict[]).map((v) => d[v] > 0 && <i key={v} className={`seg ${v}`} style={{ flex: d[v] }} title={`${d[v]} ${VERDICT_LABEL[v].toLowerCase()}`} />)}
+                  {(['scam', 'suspicious', 'safe'] as Verdict[]).map((v) => d[v] > 0 && <i key={v} className={`seg ${v}`} style={{ flex: d[v] }} title={`${d[v]} ${t(VERDICT_LABEL[v]).toLowerCase()}`} />)}
                 </div>
                 <span className="xs subtle">{d.label}</span>
               </div>
@@ -238,18 +239,18 @@ function Insights({ runs }: { runs: AnalysisRun[] }) {
           })}
         </div>
         <div className="ins-legend xs subtle">
-          {(['scam', 'suspicious', 'safe'] as Verdict[]).map((v) => <span key={v}><span className={`dot ${v}`} /> {VERDICT_LABEL[v]}</span>)}
+          {(['scam', 'suspicious', 'safe'] as Verdict[]).map((v) => <span key={v}><span className={`dot ${v}`} /> {t(VERDICT_LABEL[v])}</span>)}
         </div>
       </div>
       <div className="card card-pad ins-card">
-        <h3 className="card-title"><span className="ic rose"><Icon name="target" /></span>What is targeting you</h3>
+        <h3 className="card-title"><span className="ic rose"><Icon name="target" /></span>{t('What is targeting you')}</h3>
         {data.top.length === 0 ? (
-          <p className="small muted">No scams yet. Keep it that way.</p>
+          <p className="small muted">{t('No scams yet. Keep it that way.')}</p>
         ) : (
           <ul className="ins-bars">
             {data.top.map(([cat, n]) => (
               <li key={cat}>
-                <span className="small">{CATEGORY_LABEL[cat] ?? cat}</span>
+                <span className="small">{t(CATEGORY_LABEL[cat] ?? cat)}</span>
                 <span className="ins-bar"><i style={{ width: `${(n / data.catMax) * 100}%` }} /></span>
                 <b className="small">{n}</b>
               </li>
@@ -258,13 +259,13 @@ function Insights({ runs }: { runs: AnalysisRun[] }) {
         )}
         {data.topFlags.length > 0 && (
           <>
-            <span className="eyebrow" style={{ display: 'block', margin: '14px 0 8px' }}>Tricks you have seen most</span>
+            <span className="eyebrow" style={{ display: 'block', margin: '14px 0 8px' }}>{t('Tricks you have seen most')}</span>
             <div className="row wrap">
               {data.topFlags.map(([f, n]) => <span key={f} className="chip">{f} <b>×{n}</b></span>)}
             </div>
           </>
         )}
-        {data.avgMs !== null && <p className="xs subtle" style={{ marginTop: 12 }}>On-device checks took {(data.avgMs / 1000).toFixed(1)} s on average, with nothing sent anywhere.</p>}
+        {data.avgMs !== null && <p className="xs subtle" style={{ marginTop: 12 }}>{t(`On-device checks took ${(data.avgMs / 1000).toFixed(1)} s on average, with nothing sent anywhere.`)}</p>}
       </div>
     </section>
   );
