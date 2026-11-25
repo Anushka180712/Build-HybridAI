@@ -19,6 +19,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import app.chaukas.data.Repository
 import app.chaukas.guard.Guard
+import app.chaukas.guard.GuardService
 import app.chaukas.ui.ChaukasRoot
 import app.chaukas.ui.theme.ChaukasTheme
 import kotlinx.coroutines.Dispatchers
@@ -43,15 +44,19 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             runCatching { Repository.ensureAuth(applicationContext) }
         }
+        if (Guard.isOn(this) && Guard.hasAccess(this)) {
+            Guard.start(this)
+        }
         setContent { ChaukasTheme { ChaukasRoot(vm) } }
     }
 
     // If the phone stopped the auto-check in the background, opening the app reconnects it.
     override fun onResume() {
         super.onResume()
-        if (app.chaukas.guard.Guard.isOn(this) && app.chaukas.guard.Guard.hasAccess(this)) {
+        if (Guard.isOn(this) && Guard.hasAccess(this)) {
+            Guard.start(this)
             android.service.notification.NotificationListenerService.requestRebind(
-                android.content.ComponentName(this, app.chaukas.guard.GuardService::class.java),
+                android.content.ComponentName(this, GuardService::class.java),
             )
         }
     }

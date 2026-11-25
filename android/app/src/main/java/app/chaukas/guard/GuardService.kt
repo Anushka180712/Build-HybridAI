@@ -13,7 +13,9 @@ import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import android.provider.Telephony
 import android.service.notification.NotificationListenerService
@@ -81,6 +83,71 @@ class GuardService : NotificationListenerService() {
         }
     }
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (Guard.isOn(this)) {
+            startForegroundNotification()
+        } else {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+        return START_STICKY
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        Log.i(TAG, "app task removed by user, keeping guard alive in foreground")
+        if (Guard.isOn(this)) {
+            startForegroundNotification()
+            NotificationListenerService.requestRebind(ComponentName(this, GuardService::class.java))
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (Guard.isOn(this)) {
+            Log.w(TAG, "guard destroyed while active, sending wake-up broadcast")
+            val restart = Intent(applicationContext, GuardBootReceiver::class.java).apply {
+                action = "app.chaukas.RESTART_GUARD"
+            }
+            sendBroadcast(restart)
+        }
+    }
+
+    private fun startForegroundNotification() {
+        if (!Guard.isOn(this)) return
+        Guard.initChannels(this)
+        val open = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val note = NotificationCompat.Builder(this, Guard.SHIELD_CHANNEL)
+            .setSmallIcon(R.drawable.ic_chaukas)
+            .setContentTitle("Chaukas Scam Shield active")
+            .setContentText("Monitoring WhatsApp & SMS for scam messages on this phone")
+            .setColor(0xFF2F8A5C.toInt())
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setContentIntent(open)
+            .setShowWhen(false)
+            .build()
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(Guard.FOREGROUND_ID, note, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(Guard.FOREGROUND_ID, note, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            } else {
+                startForeground(Guard.FOREGROUND_ID, note)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "could not start foreground with type, falling back", e)
+            runCatching { startForeground(Guard.FOREGROUND_ID, note) }
+        }
+    }
+
     // Some phones (Xiaomi, Oppo, Vivo, Samsung with battery saving) stop the listener in the
     // background. Ask Android to connect it again whenever that happens.
     override fun onListenerDisconnected() {
@@ -88,12 +155,21 @@ class GuardService : NotificationListenerService() {
         Log.w(TAG, "listener disconnected, asking to rebind")
         Guard.setConnected(this, false)
         NotificationListenerService.requestRebind(ComponentName(this, GuardService::class.java))
+        if (Guard.isOn(this)) {
+            val restart = Intent(applicationContext, GuardBootReceiver::class.java).apply {
+                action = "app.chaukas.RESTART_GUARD"
+            }
+            sendBroadcast(restart)
+        }
     }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
         Log.i(TAG, "listener connected")
         Guard.setConnected(this, true)
+        if (Guard.isOn(this)) {
+            startForegroundNotification()
+        }
     }
 
     private fun appName(pkg: String): String = runCatching {
@@ -103,8 +179,13 @@ class GuardService : NotificationListenerService() {
     /** Robustly extracts message text from MessagingStyle, BigText, Inbox lines, or standard text. */
     private fun extractMessageText(n: Notification): String? {
         val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(n)
-        val styleMsg = style?.messages?.lastOrNull { !it.text.isNullOrBlank() }?.text?.toString()?.trim()
-        if (!styleMsg.isNullOrBlank() && !MessageGuard.isSummary(styleMsg)) return styleMsg
+        val messages = style?.messages?.filter { !it.text.isNullOrBlank() }
+        if (!messages.isNullOrEmpty()) {
+            val nonSummaries = messages.map { it.text.toString().trim() }.filter { !MessageGuard.isSummary(it) }
+            if (nonSummaries.isNotEmpty()) {
+                return nonSummaries.takeLast(3).joinToString("\n")
+            }
+        }
 
         val extras = n.extras ?: return null
 
@@ -148,6 +229,8 @@ object Guard {
 
     private const val SAFE_CHANNEL = "checked_safe"
     private const val SAFE_ID = 1930
+    const val SHIELD_CHANNEL = "shield_active"
+    const val FOREGROUND_ID = 4040
 
     fun initChannels(ctx: Context) {
         val nm = ctx.getSystemService(NotificationManager::class.java) ?: return
@@ -162,7 +245,50 @@ object Guard {
         val testChannel = NotificationChannel(TEST_CHANNEL, "Self-test", NotificationManager.IMPORTANCE_LOW).apply {
             description = "A test message to check that automatic warnings work"
         }
-        nm.createNotificationChannels(listOf(scamChannel, safeChannel, testChannel))
+        val shieldChannel = NotificationChannel(SHIELD_CHANNEL, "Background scam shield", NotificationManager.IMPORTANCE_LOW).apply {
+            description = "Keeps Chaukas actively monitoring incoming WhatsApp & SMS messages for scams when the app is closed"
+            setShowBadge(false)
+        }
+        nm.createNotificationChannels(listOf(scamChannel, safeChannel, testChannel, shieldChannel))
+    }
+
+    fun start(ctx: Context) {
+        if (!isOn(ctx)) return
+        initChannels(ctx)
+        val intent = Intent(ctx, GuardService::class.java)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ctx.startForegroundService(intent)
+            } else {
+                ctx.startService(intent)
+            }
+        } catch (e: Exception) {
+            Log.w("Guard", "could not start foreground service directly", e)
+        }
+        reconnect(ctx)
+    }
+
+    fun stop(ctx: Context) {
+        val intent = Intent(ctx, GuardService::class.java)
+        ctx.stopService(intent)
+    }
+
+    fun isBatteryOptimized(ctx: Context): Boolean {
+        val pm = ctx.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return false
+        return !pm.isIgnoringBatteryOptimizations(ctx.packageName)
+    }
+
+    fun requestIgnoreBatteryOptimization(ctx: Context) {
+        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+            data = android.net.Uri.parse("package:${ctx.packageName}")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        runCatching { ctx.startActivity(intent) }.onFailure {
+            val fallback = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            runCatching { ctx.startActivity(fallback) }
+        }
     }
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

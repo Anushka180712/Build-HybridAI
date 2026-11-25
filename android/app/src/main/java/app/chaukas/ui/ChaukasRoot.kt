@@ -3078,6 +3078,7 @@ private fun AutoScanToggleBar(language: String = "English") {
     var access by remember { mutableStateOf(Guard.hasAccess(ctx)) }
     var watchSms by remember { mutableStateOf(Guard.watches(ctx, "sms")) }
     var watchChat by remember { mutableStateOf(Guard.watches(ctx, "chat")) }
+    var isOptimized by remember { mutableStateOf(Guard.isBatteryOptimized(ctx)) }
     var explain by remember { mutableStateOf(false) }
 
     LifecycleResumeEffect(Unit) {
@@ -3085,6 +3086,10 @@ private fun AutoScanToggleBar(language: String = "English") {
         on = Guard.isOn(ctx)
         watchSms = Guard.watches(ctx, "sms")
         watchChat = Guard.watches(ctx, "chat")
+        isOptimized = Guard.isBatteryOptimized(ctx)
+        if (on && access) {
+            Guard.start(ctx)
+        }
         onPauseOrDispose { }
     }
 
@@ -3158,6 +3163,7 @@ private fun AutoScanToggleBar(language: String = "English") {
                         } else {
                             on = false
                             Guard.setOn(ctx, false)
+                            Guard.stop(ctx)
                         }
                     },
                     modifier = Modifier.scale(0.75f),
@@ -3193,10 +3199,12 @@ private fun AutoScanToggleBar(language: String = "English") {
                                 on = true
                                 Guard.setOn(ctx, true)
                             }
+                            Guard.start(ctx)
                             if (!access) explain = true
                         } else if (!watchChat) {
                             on = false
                             Guard.setOn(ctx, false)
+                            Guard.stop(ctx)
                         }
                     },
                     shape = RoundedCornerShape(8.dp),
@@ -3234,10 +3242,12 @@ private fun AutoScanToggleBar(language: String = "English") {
                                 on = true
                                 Guard.setOn(ctx, true)
                             }
+                            Guard.start(ctx)
                             if (!access) explain = true
                         } else if (!watchSms) {
                             on = false
                             Guard.setOn(ctx, false)
+                            Guard.stop(ctx)
                         }
                     },
                     shape = RoundedCornerShape(8.dp),
@@ -3342,6 +3352,45 @@ private fun AutoScanToggleBar(language: String = "English") {
                     }
                 }
             }
+
+            if (active && isOptimized) {
+                Surface(
+                    onClick = {
+                        Guard.requestIgnoreBatteryOptimization(ctx)
+                    },
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFFEF3F2),
+                    border = BorderStroke(1.dp, Color(0xFFFECDCA)),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Outlined.Warning,
+                            null,
+                            tint = Color(0xFFB42318),
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = I18n.t("Allow background run so scam alerts work when app is closed", language),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFB42318),
+                            modifier = Modifier.weight(1f),
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = I18n.t("Fix", language),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFB42318),
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -3367,6 +3416,7 @@ private fun AutoScanToggleBar(language: String = "English") {
                         explain = false
                         on = true
                         Guard.setOn(ctx, true)
+                        Guard.start(ctx)
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             notify.launch(Manifest.permission.POST_NOTIFICATIONS)
                         } else if (!access) {

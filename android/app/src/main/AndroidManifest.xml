@@ -8,6 +8,14 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Optional: To check whether an incoming message sender is saved in contacts -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Background persistence so scam check works when app is closed -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <queries>
         <intent>
@@ -69,10 +77,36 @@
             android:name=".guard.GuardService"
             android:exported="true"
             android:label="@string/guard_label"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:foregroundServiceType="specialUse|dataSync"
+            android:stopWithTask="false">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Scam and fraud detection on incoming chat and SMS messages" />
         </service>
+
+        <!-- Direct OS-level SMS receiver for incoming SMS fraud detection -->
+        <receiver
+            android:name=".guard.SmsReceiver"
+            android:exported="true">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Boot & restart receiver to ensure Guard restarts after device reboot or update -->
+        <receiver
+            android:name=".guard.GuardBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="app.chaukas.RESTART_GUARD" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
