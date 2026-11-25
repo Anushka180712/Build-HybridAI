@@ -36,6 +36,10 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission(),
     ) { _ -> }
 
+    private val requestSmsPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { _ -> }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -47,6 +51,9 @@ class MainActivity : ComponentActivity() {
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
             requestContactsPermission.launch(Manifest.permission.READ_CONTACTS)
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
+            requestSmsPermission.launch(Manifest.permission.RECEIVE_SMS)
         }
         lifecycleScope.launch(Dispatchers.IO) {
             runCatching { Repository.ensureAuth(applicationContext) }

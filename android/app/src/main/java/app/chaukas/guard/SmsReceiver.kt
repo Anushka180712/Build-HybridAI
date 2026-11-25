@@ -28,11 +28,11 @@ class SmsReceiver : BroadcastReceiver() {
         Guard.record(context, "Messages", "sms", alert)
         if (alert != null) {
             Log.i("ChaukasSmsReceiver", "Scam SMS detected from $from: score=${alert.score}")
-            val isUnsaved = MessageGuard.isUnsavedSender(from) { Guard.isContactSaved(context, it) }
+            val isKnown = Guard.isContactSaved(context, from) || !MessageGuard.isUnsavedSender(from) { Guard.isContactSaved(context, it) }
             val id = (from + body).hashCode()
-            Guard.warn(context, alert, id, isKnownContact = !isUnsaved)
-            Guard.onAlertCallback?.invoke(alert, "Messages", !isUnsaved)
-            if (alert.score >= Guard.SCAM_AT && isUnsaved) {
+            Guard.warn(context, alert, id, isKnownContact = isKnown)
+            Guard.onAlertCallback?.invoke(alert, "Messages", isKnown)
+            if (alert.score >= Guard.SCAM_AT && !isKnown) {
                 Guard.onScamDetected(context, "Messages", "sms", alert)
             }
         }

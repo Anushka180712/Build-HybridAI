@@ -1296,7 +1296,7 @@ private fun ResultView(
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-            } else if (a.verdict != Verdict.SAFE && a.riskScore >= 65) {
+            } else if (a.verdict != Verdict.SAFE && a.riskScore >= 60) {
                 Surface(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     shape = RoundedCornerShape(12.dp),
@@ -1316,6 +1316,30 @@ private fun ResultView(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp,
                             )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            onClick = {
+                                vm.dismissRun()
+                                Toast.makeText(ctx, I18n.t("Dismissed", vm.language), Toast.LENGTH_SHORT).show()
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color.White,
+                            border = BorderStroke(1.dp, Color(0xFFD0D5DD)),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(Icons.Outlined.CheckCircle, null, modifier = Modifier.size(13.dp), tint = Color(0xFF2E7D32))
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    I18n.t("It's okay", vm.language),
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 11.sp,
+                                    color = Chaukas.Ink2,
+                                )
+                            }
                         }
                     }
                 }
@@ -3234,6 +3258,9 @@ private fun AutoScanToggleBar(language: String = "English") {
     var hasContactsPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED)
     }
+    var hasSmsPermission by remember {
+        mutableStateOf(ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED)
+    }
     var explain by remember { mutableStateOf(false) }
 
     LifecycleResumeEffect(Unit) {
@@ -3243,6 +3270,7 @@ private fun AutoScanToggleBar(language: String = "English") {
         watchChat = Guard.watches(ctx, "chat")
         isOptimized = Guard.isBatteryOptimized(ctx)
         hasContactsPermission = ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+        hasSmsPermission = ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
         if (on && access) {
             Guard.start(ctx)
         }
@@ -3251,6 +3279,10 @@ private fun AutoScanToggleBar(language: String = "English") {
 
     val requestContacts = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         hasContactsPermission = granted
+    }
+
+    val requestSms = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        hasSmsPermission = granted
     }
 
     val notify = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -3508,6 +3540,124 @@ private fun AutoScanToggleBar(language: String = "English") {
                                     color = Chaukas.Ink2,
                                 )
                             }
+                        }
+                    }
+                }
+            }
+
+            if (on && !access) {
+                Surface(
+                    onClick = { Guard.openAccess(ctx) },
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFFEF3F2),
+                    border = BorderStroke(1.dp, Color(0xFFFECDCA)),
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFFFEBEE)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Outlined.NotificationsActive,
+                                contentDescription = null,
+                                tint = Color(0xFFC62828),
+                                modifier = Modifier.size(17.dp),
+                            )
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = I18n.t("Notification access needed", language),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFB42318),
+                            )
+                            Spacer(Modifier.height(1.dp))
+                            Text(
+                                text = I18n.t("Allow Chaukas in system settings to detect WhatsApp and SMS scams", language),
+                                fontSize = 11.sp,
+                                color = Color(0xFF912018),
+                                lineHeight = 14.sp,
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFFC62828),
+                        ) {
+                            Text(
+                                text = I18n.t("Enable", language),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (on && watchSms && !hasSmsPermission) {
+                Surface(
+                    onClick = { requestSms.launch(Manifest.permission.RECEIVE_SMS) },
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFEFF6FF),
+                    border = BorderStroke(1.dp, Color(0xFFBFDBFE)),
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFDBEAFE)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Outlined.Sms,
+                                contentDescription = null,
+                                tint = Color(0xFF2563EB),
+                                modifier = Modifier.size(17.dp),
+                            )
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = I18n.t("Allow SMS scan", language),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1E40AF),
+                            )
+                            Spacer(Modifier.height(1.dp))
+                            Text(
+                                text = I18n.t("Grant SMS permission to catch fraud text messages instantly", language),
+                                fontSize = 11.sp,
+                                color = Color(0xFF1D4ED8),
+                                lineHeight = 14.sp,
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFF2563EB),
+                        ) {
+                            Text(
+                                text = I18n.t("Allow", language),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            )
                         }
                     }
                 }

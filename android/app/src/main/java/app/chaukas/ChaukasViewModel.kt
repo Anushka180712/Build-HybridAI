@@ -16,11 +16,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import app.chaukas.ai.Analysis
 import app.chaukas.ai.AnalysisRun
 import app.chaukas.ai.HybridEngine
 import app.chaukas.ai.ModelState
 import app.chaukas.ai.PrivacyMode
+import app.chaukas.ai.RedFlag
 import app.chaukas.ai.Signals
+import app.chaukas.ai.Source
 import app.chaukas.ai.Verdict
 import app.chaukas.data.HistoryCounts
 import app.chaukas.data.HistoryState
@@ -323,14 +326,61 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
                 } else {
                     val r = engine.analyze(text, mode, redact, emptyList(), language)
                     run = r
-                    if (!effectiveIsKnown && r.analysis.verdict != Verdict.SAFE && r.analysis.riskScore >= 65) {
+                    if (!effectiveIsKnown && r.analysis.verdict != Verdict.SAFE && r.analysis.riskScore >= 60) {
                         saveCurrentRunToHistory()
                     } else {
                         isSavedToHistory = false
                     }
                 }
             } catch (e: Exception) {
-                error = e.message ?: "Something went wrong."
+                // Instant fallback from Signals if engine.analyze throws (offline / quota / timeout)
+                val (signals, score) = Signals.compute(text)
+                val category = when {
+                    signals.any { it.id == "power_cut" } -> "delivery_fee"
+                    signals.any { it.id == "india_kyc" || it.id == "credentials" } -> "bank_or_payment"
+                    signals.any { it.id == "prize" } -> "prize_lottery"
+                    signals.any { it.id == "job_scam" } -> "job_offer"
+                    else -> "phishing"
+                }
+                val redFlags = signals.map { sig ->
+                    RedFlag(
+                        label = sig.label,
+                        evidence = sig.matches.firstOrNull() ?: text.take(50),
+                        why = "Identified on device: ${sig.label}",
+                    )
+                }
+                val verdict = when {
+                    score >= 60 -> Verdict.SCAM
+                    score >= 30 -> Verdict.SUSPICIOUS
+                    else -> Verdict.SAFE
+                }
+                val fallbackRun = AnalysisRun(
+                    id = java.util.UUID.randomUUID().toString(),
+                    createdAt = System.currentTimeMillis(),
+                    input = text,
+                    analysis = Analysis(
+                        verdict = verdict,
+                        riskScore = score,
+                        category = category,
+                        summary = if (verdict == Verdict.SCAM) "This message contains clear scam patterns." else "This message may be suspicious.",
+                        redFlags = redFlags,
+                        nextSteps = listOf(
+                            "Do not click any links or call numbers provided.",
+                            "Never share OTP, PIN, or passwords.",
+                            "Block and report the sender.",
+                        ),
+                        safeReply = "I will not share any details or open any links.",
+                    ),
+                    source = Source.ON_DEVICE,
+                    latencyMs = 8L,
+                    redactions = 0,
+                )
+                run = fallbackRun
+                if (!effectiveIsKnown && score >= 60) {
+                    saveCurrentRunToHistory()
+                } else {
+                    isSavedToHistory = false
+                }
             } finally {
                 busy = false
             }

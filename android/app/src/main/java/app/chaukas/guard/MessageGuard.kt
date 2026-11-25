@@ -39,16 +39,19 @@ object MessageGuard {
 
     /** "sms", "chat", or null for apps that are not checked. */
     fun kind(pkg: String, extraSms: Set<String> = emptySet()): String? = when {
-        pkg in SMS_APPS || pkg in extraSms -> "sms"
-        pkg in CHAT_APPS || pkg.startsWith("com.whatsapp.") -> "chat"
+        pkg == "sms" || pkg in SMS_APPS || pkg in extraSms -> "sms"
+        pkg == "chat" || pkg in CHAT_APPS ||
+            pkg.startsWith("com.whatsapp.") ||
+            pkg.contains("whatsapp", ignoreCase = true) ||
+            pkg.contains("telegram", ignoreCase = true) -> "chat"
         else -> null
     }
 
     /** Shorter than this, a message is counted as checked but cannot carry a scam. */
-    private const val MIN_SCAM_LENGTH = 12
+    private const val MIN_SCAM_LENGTH = 16
 
-    /** Warn at "suspicious" or worse (score >= 30), so any real fraud signal raises an alert. */
-    const val THRESHOLD = 30
+    /** Warn at "suspicious" or worse (score >= 25), so any real fraud signal raises an alert. */
+    const val THRESHOLD = 25
 
     private val summary = Regex("""^\d+ (new )?messages?( from \d+ chats?)?$""", RegexOption.IGNORE_CASE)
 

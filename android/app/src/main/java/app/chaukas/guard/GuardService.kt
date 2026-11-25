@@ -28,6 +28,7 @@ import app.chaukas.R
 import app.chaukas.ai.Analysis
 import app.chaukas.ai.AnalysisRun
 import app.chaukas.ai.RedFlag
+import app.chaukas.ai.Signals
 import app.chaukas.ai.Source
 import app.chaukas.ai.Verdict
 import app.chaukas.data.LocalHistory
@@ -37,7 +38,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class GuardService : NotificationListenerService() {
-    private val seen = LinkedHashSet<String>()
+    private val seenTimes = LinkedHashMap<String, Long>()
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         // Proof that this service really receives notifications: the app's own self-test.
@@ -64,14 +65,21 @@ class GuardService : NotificationListenerService() {
         val kind = MessageGuard.kind(sbn.packageName, watched) ?: return
         if (!Guard.watches(this, kind)) return
         if (!MessageGuard.checkable(sbn.packageName, text, watched)) return
-        // Apps re-post the same message on every update: check each one once.
+
+        // Apps re-post the same message on every update: check each one once, debouncing within 5s
         val key = MessageGuard.key(sbn.packageName, text)
-        if (!seen.add(key)) return
-        if (seen.size > 200) seen.remove(seen.first())
+        val now = System.currentTimeMillis()
+        val lastSeen = seenTimes[key] ?: 0L
+        if (now - lastSeen < 5000L) return
+        seenTimes[key] = now
+        if (seenTimes.size > 200) {
+            seenTimes.keys.firstOrNull()?.let { seenTimes.remove(it) }
+        }
+
         val alert = MessageGuard.assess(sbn.packageName, from, text, watched)
         Guard.record(this, appName(sbn.packageName), kind, alert)
         if (alert != null) {
-            Log.i(TAG, "warned: score=${alert.score}")
+            Log.i(TAG, "warned: score=${alert.score} from=$from")
             val title = sbn.notification.extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
             val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(sbn.notification)
             val person = style?.messages?.lastOrNull { !it.text.isNullOrBlank() }?.person?.name?.toString().orEmpty()
@@ -83,7 +91,8 @@ class GuardService : NotificationListenerService() {
                 (title.isNotBlank() && !MessageGuard.isUnsavedSender(title) { Guard.isContactSaved(this, it) }) ||
                 (person.isNotBlank() && !MessageGuard.isUnsavedSender(person) { Guard.isContactSaved(this, it) })
 
-            Guard.warn(this, alert, key.hashCode(), isKnownContact = isKnown)
+            val notificationId = (sbn.packageName + from + text).hashCode()
+            Guard.warn(this, alert, notificationId, isKnownContact = isKnown)
             Guard.onAlertCallback?.invoke(alert, appName(sbn.packageName), isKnown)
             if (alert.score >= Guard.SCAM_AT && !isKnown) {
                 Guard.onScamDetected(this, appName(sbn.packageName), kind, alert)
@@ -193,6 +202,9 @@ class GuardService : NotificationListenerService() {
         if (!messages.isNullOrEmpty()) {
             val nonSummaries = messages.map { it.text.toString().trim() }.filter { !MessageGuard.isSummary(it) }
             if (nonSummaries.isNotEmpty()) {
+                val latest = nonSummaries.last()
+                val (_, latestScore) = Signals.compute(latest)
+                if (latestScore >= MessageGuard.THRESHOLD) return latest
                 return nonSummaries.takeLast(3).joinToString("\n")
             }
         }
@@ -200,11 +212,23 @@ class GuardService : NotificationListenerService() {
         val extras = n.extras ?: return null
 
         val big = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()?.trim()
-        if (!big.isNullOrBlank() && !MessageGuard.isSummary(big)) return big
+        if (!big.isNullOrBlank() && !MessageGuard.isSummary(big)) {
+            val (_, score) = Signals.compute(big)
+            if (score >= MessageGuard.THRESHOLD) return big
+        }
 
         val lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
-        val lastLine = lines?.lastOrNull { !it.isNullOrBlank() }?.toString()?.trim()
-        if (!lastLine.isNullOrBlank() && !MessageGuard.isSummary(lastLine)) return lastLine
+        if (!lines.isNullOrEmpty()) {
+            for (line in lines.reversed()) {
+                val s = line?.toString()?.trim().orEmpty()
+                if (s.isNotBlank() && !MessageGuard.isSummary(s)) {
+                    val (_, score) = Signals.compute(s)
+                    if (score >= MessageGuard.THRESHOLD) return s
+                }
+            }
+            val lastLine = lines.lastOrNull { !it.isNullOrBlank() }?.toString()?.trim()
+            if (!lastLine.isNullOrBlank() && !MessageGuard.isSummary(lastLine)) return lastLine
+        }
 
         val txt = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim()
         if (!txt.isNullOrBlank() && !MessageGuard.isSummary(txt)) return txt
@@ -323,7 +347,7 @@ object Guard {
     const val KEEP_MS = 3L * 24 * 60 * 60 * 1000
 
     /** Risk at which a warning is called a scam rather than "be careful". */
-    const val SCAM_AT = 65
+    const val SCAM_AT = 60
 
     /** One warning: when, which app, its score and the top reasons. No message text is kept. */
     data class Entry(val at: Long, val app: String, val score: Int?, val reasons: String = "") {
@@ -523,10 +547,10 @@ object Guard {
         val pending = PendingIntent.getActivity(ctx, id, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val title = if (isKnownContact) {
             "⚠️ Red flags in message from ${alert.from}"
-        } else if (alert.score >= 70) {
-            "This message looks like a scam"
+        } else if (alert.score >= 60) {
+            "⚠️ Scam alert: This message looks like fraud"
         } else {
-            "Be careful with this message"
+            "⚠️ Warning: Suspicious message"
         }
         val body = if (isKnownContact) {
             "Why it's flagged: ${alert.reasons.joinToString(" · ")}. Their phone or account may be compromised. Tap to inspect, or dismiss if safe."
@@ -578,7 +602,12 @@ object Guard {
         }
 
         val notification = builder.build()
-        runCatching { NotificationManagerCompat.from(ctx).notify(id, notification) }
+        try {
+            NotificationManagerCompat.from(ctx).notify(id, notification)
+            Log.i("ChaukasGuard", "Notification posted successfully: id=$id title=$title")
+        } catch (e: Exception) {
+            Log.e("ChaukasGuard", "Failed to post notification id=$id", e)
+        }
     }
 
     /**
