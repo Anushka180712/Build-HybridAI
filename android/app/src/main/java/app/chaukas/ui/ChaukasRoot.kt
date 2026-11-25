@@ -2790,7 +2790,8 @@ private fun GroupCard(
                 Text(I18n.t("Leave group", language), fontSize = 12.sp)
             }
 
-            if (circle.ownerUid == myUid || circle.members.size == 1) {
+            val isCreator = circle.ownerUid.isNotBlank() && circle.ownerUid == myUid
+            if (isCreator) {
                 Spacer(Modifier.width(8.dp))
                 TextButton(
                     onClick = onDelete,

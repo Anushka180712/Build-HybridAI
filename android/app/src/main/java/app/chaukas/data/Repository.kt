@@ -393,7 +393,7 @@ object Repository {
         val user = runCatching { ensureAuth(context) }.getOrNull()
         val u = user?.uid ?: uid ?: return
         val ref = db.collection("circles").document(circle.id)
-        if (circle.ownerUid == u || circle.members.all { it == u }) {
+        if (circle.ownerUid == u) {
             ref.delete().await()
         } else {
             leaveCircle(circle, context)

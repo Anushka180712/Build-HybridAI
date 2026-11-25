@@ -368,12 +368,12 @@ function GroupCard({ circle, uid, myName }: { circle: Circle; uid: string; myNam
         >
           <Icon name="logout" /> {t('Leave group')}
         </button>
-        {(circle.ownerUid === uid || circle.members.length === 1) && (
+        {Boolean(circle.ownerUid && circle.ownerUid === uid) && (
           <button
             className="btn sm ghost group-delete"
             style={{ color: 'var(--rose-700, #b91c1c)' }}
             onClick={() => {
-              if (!window.confirm(`Delete ${circle.name}? This will delete the group for all members.`)) return;
+              if (!window.confirm(`Delete ${circle.name}? As the creator, this will delete the group for all members.`)) return;
               deleteCircle(circle).then(
                 () => toast('Group deleted'),
                 () => toast('Could not delete the group', 'x'),

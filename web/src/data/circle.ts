@@ -112,11 +112,11 @@ export async function leaveCircle(circle: Circle) {
   }
 }
 
-/** Delete a group completely (for owners/creators). */
+/** Delete a group completely (only for creators/owners). */
 export async function deleteCircle(circle: Circle) {
   const { fb, user } = need();
   const ref = doc(fb.db, 'circles', circle.id);
-  if (circle.ownerUid === user.uid || circle.members.every((m) => m === user.uid)) {
+  if (circle.ownerUid === user.uid) {
     await deleteDoc(ref);
   } else {
     await leaveCircle(circle);
