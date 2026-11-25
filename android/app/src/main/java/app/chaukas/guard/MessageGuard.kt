@@ -110,8 +110,6 @@ object MessageGuard {
         if (isContactSavedLookup != null) {
             val isSaved = runCatching { isContactSavedLookup(trimmed) }.getOrDefault(false)
             if (isSaved) return false
-            // When lookup was performed and contact is not in address book (e.g. deleted), it IS unsaved!
-            return true
         }
 
         // 4. Explicit unknown labels

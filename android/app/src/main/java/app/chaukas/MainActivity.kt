@@ -32,6 +32,10 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission(),
     ) { _ -> }
 
+    private val requestContactsPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { _ -> }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -40,6 +44,9 @@ class MainActivity : ComponentActivity() {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            requestContactsPermission.launch(Manifest.permission.READ_CONTACTS)
         }
         lifecycleScope.launch(Dispatchers.IO) {
             runCatching { Repository.ensureAuth(applicationContext) }
@@ -75,6 +82,8 @@ class MainActivity : ComponentActivity() {
             vm.checkImage(this, uri)
             return
         }
+        val isKnown = intent.getBooleanExtra(Guard.EXTRA_IS_KNOWN, false)
+        val from = intent.getStringExtra(Guard.EXTRA_FROM).orEmpty()
         val shared = when (intent.action) {
             Intent.ACTION_SEND, Guard.ACTION_CHECK -> intent.getStringExtra(Intent.EXTRA_TEXT)
             Intent.ACTION_PROCESS_TEXT -> intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()
@@ -82,7 +91,7 @@ class MainActivity : ComponentActivity() {
         }
         if (!shared.isNullOrBlank()) {
             vm.text = shared
-            vm.check()
+            vm.check(isKnown = isKnown, fromSender = from)
         }
     }
 }

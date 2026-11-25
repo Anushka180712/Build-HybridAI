@@ -151,7 +151,7 @@ fun ChaukasRoot(vm: ChaukasViewModel) {
                                 if (!alert.text.isNullOrBlank()) {
                                     vm.text = alert.text
                                     tab = Tab.CHECK
-                                    vm.check()
+                                    vm.check(isKnown = alert.isKnownContact, fromSender = alert.from.orEmpty())
                                 }
                                 vm.dismissInAppAlert()
                             },
@@ -1203,6 +1203,120 @@ private fun ResultView(
             HorizontalDivider(color = fg.copy(alpha = 0.15f))
             Spacer(Modifier.height(10.dp))
 
+            if (vm.isKnownContact) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color(0xFFFFF8F0),
+                    border = BorderStroke(1.dp, Color(0xFFFFB74D)),
+                ) {
+                    Column(Modifier.padding(14.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Outlined.WarningAmber,
+                                null,
+                                tint = Color(0xFFE65100),
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                if (vm.senderName.isNotBlank()) "Message from ${vm.senderName}" else I18n.t("Message from saved contact", vm.language),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = Color(0xFFE65100),
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            I18n.t(
+                                "This sender is in your contacts, but this message has red flags. Their account may be compromised. Choose what to do:",
+                                vm.language,
+                            ),
+                            fontSize = 12.sp,
+                            color = Chaukas.Ink2,
+                            lineHeight = 16.sp,
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Button(
+                                onClick = {
+                                    vm.saveCurrentRunToHistory()
+                                    Toast.makeText(
+                                        ctx,
+                                        I18n.t("Shared as scam to circle & history", vm.language),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                },
+                                enabled = !vm.isSavedToHistory,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFC62828),
+                                    contentColor = Color.White,
+                                ),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Icon(Icons.Outlined.Share, null, modifier = Modifier.size(15.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    if (vm.isSavedToHistory) I18n.t("Shared to circle & history", vm.language) else I18n.t("Share as scam", vm.language),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    vm.dismissRun()
+                                    Toast.makeText(
+                                        ctx,
+                                        I18n.t("Dismissed", vm.language),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Icon(Icons.Outlined.CheckCircle, null, modifier = Modifier.size(15.dp), tint = Color(0xFF2E7D32))
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    I18n.t("It's okay", vm.language),
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 12.sp,
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            } else if (a.verdict != Verdict.SAFE && a.riskScore >= 65) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Chaukas.Mint50,
+                    border = BorderStroke(1.dp, Chaukas.Mint600),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Outlined.Shield, null, tint = Chaukas.Mint700, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                I18n.t("Auto-shared to Family Circle & saved to History", vm.language),
+                                color = Chaukas.Mint700,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+
             // Actions row: Read aloud, Call 1930, Send to WhatsApp, Tell my circle
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1348,7 +1462,40 @@ private fun ResultView(
                 onDismissRequest = { expandedFlag = null },
                 confirmButton = {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (!vm.isSavedToHistory) {
+                        if (vm.isKnownContact) {
+                            Button(
+                                onClick = {
+                                    vm.saveCurrentRunToHistory()
+                                    expandedFlag = null
+                                    Toast.makeText(
+                                        ctx,
+                                        I18n.t("Shared as scam to circle & history", vm.language),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                },
+                                enabled = !vm.isSavedToHistory,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
+                                shape = RoundedCornerShape(12.dp),
+                            ) {
+                                Text(
+                                    if (vm.isSavedToHistory) I18n.t("Shared to circle & history", vm.language) else I18n.t("Share as scam", vm.language),
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    expandedFlag = null
+                                    vm.dismissRun()
+                                    Toast.makeText(
+                                        ctx,
+                                        I18n.t("Dismissed", vm.language),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                            ) {
+                                Text(I18n.t("It's okay", vm.language))
+                            }
+                        } else if (!vm.isSavedToHistory) {
                             Button(
                                 onClick = {
                                     vm.saveCurrentRunToHistory()
@@ -3093,6 +3240,8 @@ private fun AutoScanToggleBar(language: String = "English") {
         onPauseOrDispose { }
     }
 
+    val requestContacts = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
+
     val notify = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
             if (!access) {
@@ -3417,6 +3566,9 @@ private fun AutoScanToggleBar(language: String = "English") {
                         on = true
                         Guard.setOn(ctx, true)
                         Guard.start(ctx)
+                        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+                            requestContacts.launch(Manifest.permission.READ_CONTACTS)
+                        }
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             notify.launch(Manifest.permission.POST_NOTIFICATIONS)
                         } else if (!access) {

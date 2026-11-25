@@ -97,6 +97,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- Quick actions from notification (e.g. It's okay / dismiss) -->
+        <receiver
+            android:name=".guard.GuardActionReceiver"
+            android:exported="false" />
+
         <!-- Boot & restart receiver to ensure Guard restarts after device reboot or update -->
         <receiver
             android:name=".guard.GuardBootReceiver"

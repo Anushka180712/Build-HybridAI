@@ -218,6 +218,9 @@ object Guard {
     private const val PREFS = "chaukas.guard"
     private const val CHANNEL = "scam_warnings"
     const val ACTION_CHECK = "app.chaukas.CHECK"
+    const val EXTRA_IS_KNOWN = "extra_is_known"
+    const val EXTRA_FROM = "extra_from"
+    const val EXTRA_SCORE = "extra_score"
 
     /** Callback invoked when an alert is detected so an in-app banner can be displayed if app is foreground. */
     var onAlertCallback: ((GuardAlert, String, Boolean) -> Unit)? = null
@@ -496,6 +499,9 @@ object Guard {
         val open = Intent(ctx, MainActivity::class.java)
             .setAction(ACTION_CHECK)
             .putExtra(Intent.EXTRA_TEXT, alert.text)
+            .putExtra(EXTRA_IS_KNOWN, isKnownContact)
+            .putExtra(EXTRA_FROM, alert.from)
+            .putExtra(EXTRA_SCORE, alert.score)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val pending = PendingIntent.getActivity(ctx, id, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val title = if (isKnownContact) {
@@ -506,12 +512,12 @@ object Guard {
             "Be careful with this message"
         }
         val body = if (isKnownContact) {
-            "Why it's flagged: ${alert.reasons.joinToString(" · ")}. Their phone or account may be compromised. Don't send money or tap links."
+            "Why it's flagged: ${alert.reasons.joinToString(" · ")}. Their phone or account may be compromised. Tap to inspect, or dismiss if safe."
         } else {
             val who = if (alert.from.isNotBlank()) "From ${alert.from}. " else ""
             "$who${alert.reasons.joinToString(" · ")}. Don't tap links or share codes. Tap for a full check."
         }
-        val notification = NotificationCompat.Builder(ctx, CHANNEL)
+        val builder = NotificationCompat.Builder(ctx, CHANNEL)
             .setSmallIcon(R.drawable.ic_chaukas)
             .setContentTitle(title)
             .setContentText(body)
@@ -522,7 +528,39 @@ object Guard {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(pending)
             .setAutoCancel(true)
-            .build()
+
+        if (isKnownContact) {
+            // Action 1: Tap to open and share as scam
+            val shareIntent = Intent(ctx, MainActivity::class.java).apply {
+                action = ACTION_CHECK
+                putExtra(Intent.EXTRA_TEXT, alert.text)
+                putExtra(EXTRA_IS_KNOWN, true)
+                putExtra(EXTRA_FROM, alert.from)
+                putExtra(EXTRA_SCORE, alert.score)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+            val sharePending = PendingIntent.getActivity(
+                ctx,
+                id + 1,
+                shareIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            builder.addAction(0, "Share as scam", sharePending)
+
+            // Action 2: Quick dismiss "It's okay"
+            val dismissIntent = Intent(ctx, GuardActionReceiver::class.java).apply {
+                putExtra("notification_id", id)
+            }
+            val dismissPending = PendingIntent.getBroadcast(
+                ctx,
+                id + 2,
+                dismissIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            builder.addAction(0, "It's okay", dismissPending)
+        }
+
+        val notification = builder.build()
         runCatching { NotificationManagerCompat.from(ctx).notify(id, notification) }
     }
 

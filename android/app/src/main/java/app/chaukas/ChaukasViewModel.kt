@@ -66,6 +66,7 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
     var language by mutableStateOf(prefs.getString("language", "English") ?: "English")
     var autoShareCircle by mutableStateOf(prefs.getBoolean("autoShareCircle", true))
     var isKnownContact by mutableStateOf(false)
+    var senderName by mutableStateOf("")
     var isSavedToHistory by mutableStateOf(false)
 
     data class InAppAlert(
@@ -75,12 +76,20 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
         val from: String? = null,
         val text: String? = null,
         val isScam: Boolean = true,
+        val isKnownContact: Boolean = false,
     )
 
     var inAppAlert by mutableStateOf<InAppAlert?>(null)
 
-    fun showInAppAlert(title: String, message: String, score: Int? = null, from: String? = null, text: String? = null) {
-        inAppAlert = InAppAlert(title, message, score, from, text, (score ?: 0) >= 65)
+    fun showInAppAlert(
+        title: String,
+        message: String,
+        score: Int? = null,
+        from: String? = null,
+        text: String? = null,
+        isKnownContact: Boolean = false,
+    ) {
+        inAppAlert = InAppAlert(title, message, score, from, text, (score ?: 0) >= 65, isKnownContact)
     }
 
     fun dismissInAppAlert() {
@@ -115,6 +124,7 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
                     score = alert.score,
                     from = if (alert.from.isNotBlank()) alert.from else appName,
                     text = alert.text,
+                    isKnownContact = isKnown,
                 )
             }
         }
@@ -280,13 +290,16 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
         }.getOrNull()
     }
 
-    fun check() {
+    fun check(isKnown: Boolean = false, fromSender: String = "") {
         if (text.isBlank() && attachedImageUri == null && attachedBitmap == null) return
         if (busy) return
         busy = true
         error = null
         run = null
         stage = 0
+        isKnownContact = isKnown
+        senderName = fromSender
+        isSavedToHistory = false
 
         // Stage progress animation
         viewModelScope.launch {
@@ -298,9 +311,19 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
 
         viewModelScope.launch {
             try {
-                val r = engine.analyze(text, mode, redact, emptyList(), language)
-                run = r
-                isSavedToHistory = false
+                val existing = if (!isKnown) history.runs.firstOrNull { it.input.trim() == text.trim() } else null
+                if (existing != null) {
+                    run = existing
+                    isSavedToHistory = true
+                } else {
+                    val r = engine.analyze(text, mode, redact, emptyList(), language)
+                    run = r
+                    if (!isKnown && r.analysis.verdict != Verdict.SAFE && r.analysis.riskScore >= 65) {
+                        saveCurrentRunToHistory()
+                    } else {
+                        isSavedToHistory = false
+                    }
+                }
             } catch (e: Exception) {
                 error = e.message ?: "Something went wrong."
             } finally {
@@ -309,13 +332,24 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun dismissRun() {
+        run = null
+        text = ""
+        attachedImageUri = null
+        attachedBitmap = null
+        error = null
+        isKnownContact = false
+        senderName = ""
+        isSavedToHistory = false
+    }
+
     fun saveCurrentRunToHistory() {
         val r = run ?: return
         if (isSavedToHistory) return
         saveRun(r)
         Repository.saveCheck(r)
         isSavedToHistory = true
-        if (!isKnownContact && autoShareCircle && r.analysis.verdict != Verdict.SAFE && r.analysis.riskScore >= 65) {
+        if (r.analysis.verdict != Verdict.SAFE && r.analysis.riskScore >= 65) {
             viewModelScope.launch {
                 runCatching { Repository.autoShareToCircles(r) }
             }
