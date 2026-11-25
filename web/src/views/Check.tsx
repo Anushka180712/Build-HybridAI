@@ -97,6 +97,19 @@ export function CheckView() {
   const willRunLocally = device.availability === 'available' && settings.mode !== 'cloud';
   const engineName = isPreviewEngine() ? 'Preview checks' : willRunLocally ? 'Gemini Nano on this device' : settings.mode === 'private' ? 'Gemini Nano (not ready)' : 'Gemini in the cloud';
 
+  const [savedToHistory, setSavedToHistory] = useState(false);
+
+  const handleSaveToHistory = (targetRun?: AnalysisRun) => {
+    const toSave = targetRun ?? run;
+    if (!toSave) return;
+    saveRun(toSave);
+    setSavedToHistory(true);
+    toast(t('Added to history'), 'check');
+    if (!isKnownContact) {
+      autoShareToCircles(toSave).then((names) => names.length && toast(`${t('Shared with')} ${names.join(', ')}`), () => undefined);
+    }
+  };
+
   /**
    * `once.cloud` sends this one check to the cloud after the person tapped a "Check with cloud"
    * button. `once.noImage` leaves the picture out: only the text and the QR code decoded on this
@@ -108,6 +121,7 @@ export function CheckView() {
     setBusy(true);
     setError(null);
     setRun(null);
+    setSavedToHistory(false);
     try {
       const qrNote = qr.length ? `\n\n[QR code in the screenshot: ${qr.map((f) => `${f.raw} (${f.headline})`).join('; ')}]` : '';
       const base = engineSettings();
@@ -133,10 +147,8 @@ export function CheckView() {
         toast(t('Read on this phone. Only the words were checked, with personal details removed.'));
       }
       setRun(r);
-      saveRun(r);
-      if (!isKnownContact) {
-        autoShareToCircles(r).then((names) => names.length && toast(`Shared with ${names.join(', ')}`), () => undefined);
-      } else if (r.analysis.verdict !== 'safe' && r.analysis.riskScore >= 65) {
+      setSavedToHistory(false);
+      if (isKnownContact && r.analysis.verdict !== 'safe' && r.analysis.riskScore >= 65) {
         const flags = r.analysis.redFlags.map((f) => f.label).join(' · ');
         toast(`${t('Red flags detected from contact:')} ${flags}. ${t('Kept private to protect your contact.')}`, 'alert');
       }
@@ -147,7 +159,7 @@ export function CheckView() {
     }
   };
 
-  const addImage = async (file: File | Blob | null | undefined) => {
+  const addImage = async (file: File | Blob | null | undefined, skipOcr = false) => {
     if (!file || !file.type.startsWith('image/')) return;
     try {
       const img = await fileToImageInput(file);
@@ -157,12 +169,14 @@ export function CheckView() {
       setQr(codes.map(inspectQr));
       if (codes.length) toast('Found a QR code in the screenshot', 'info');
 
-      // Fast on-device OCR scan to immediately read text and populate the composer
-      toast(t('Reading the words in your screenshot on this phone…'), 'info');
-      const read = await readTextOnDevice(img.previewUrl);
-      if (read && read.trim()) {
-        setText((prev) => (prev.trim() ? `${prev.trim()}\n${read.trim()}` : read.trim()));
-        toast(t('Read on this phone. Checking message…'), 'info');
+      // Fast on-device OCR scan to immediately read text and populate the composer (unless skipped for localized samples)
+      if (!skipOcr) {
+        toast(t('Reading the words in your screenshot on this phone…'), 'info');
+        const read = await readTextOnDevice(img.previewUrl);
+        if (read && read.trim()) {
+          setText((prev) => (prev.trim() ? `${prev.trim()}\n${read.trim()}` : read.trim()));
+          toast(t('Read on this phone. Checking message…'), 'info');
+        }
       }
     } catch {
       toast('That image could not be read', 'x');
@@ -345,7 +359,7 @@ export function CheckView() {
                 onClick={async () => {
                   try {
                     const blob = await (await fetch(`${import.meta.env.BASE_URL}samples/upi-qr-scam.png`)).blob();
-                    await addImage(new File([blob], 'upi-qr-scam.png', { type: 'image/png' }));
+                    await addImage(new File([blob], 'upi-qr-scam.png', { type: 'image/png' }), true);
                     setText(t('Congratulations! Your Flipkart cashback refund of Rs 4,999 is approved. Scan this QR to receive the money in your account now.'));
                   } catch {
                     toast('Could not load the example', 'x');
@@ -506,7 +520,14 @@ export function CheckView() {
         </div>
       )}
 
-      {run && <Result run={run} onChange={setRun} />}
+      {run && (
+        <Result
+          run={run}
+          onChange={setRun}
+          savedToHistory={savedToHistory}
+          onSaveToHistory={handleSaveToHistory}
+        />
+      )}
 
       {!run && !busy && <HowItWorks />}
     </div>

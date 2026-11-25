@@ -135,6 +135,98 @@ fun ChaukasRoot(vm: ChaukasViewModel) {
                 Tab.DOJO -> DojoScreen(vm)
                 Tab.ENGINE -> EngineScreen(vm)
             }
+
+            // Pretty in-app notification banner when an alert arrives while app is in foreground
+            vm.inAppAlert?.let { alert ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                        .align(Alignment.TopCenter),
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                if (!alert.text.isNullOrBlank()) {
+                                    vm.text = alert.text
+                                    tab = Tab.CHECK
+                                    vm.check()
+                                }
+                                vm.dismissInAppAlert()
+                            },
+                        shape = RoundedCornerShape(18.dp),
+                        color = Color(0xFF1E1B26),
+                        border = BorderStroke(1.dp, if (alert.isScam) Color(0xFFE53935) else Color(0xFF2F8F6B)),
+                        shadowElevation = 10.dp,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(if (alert.isScam) Color(0xFFFFEBEE) else Color(0xFFE8F5E9)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    if (alert.isScam) Icons.Outlined.WarningAmber else Icons.Outlined.Shield,
+                                    null,
+                                    tint = if (alert.isScam) Color(0xFFC62828) else Color(0xFF2E7D32),
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = if (alert.isScam) Color(0xFFC62828) else Color(0xFF2E7D32),
+                                    ) {
+                                        Text(
+                                            if (alert.isScam) "SCAM ALERT ${alert.score ?: 85}%" else "CHECKED SAFE",
+                                            color = Color.White,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        )
+                                    }
+                                    if (!alert.from.isNullOrBlank()) {
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(alert.from, color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                }
+                                Spacer(Modifier.height(3.dp))
+                                Text(
+                                    alert.title,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    alert.message,
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    fontSize = 12.sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            IconButton(
+                                onClick = { vm.dismissInAppAlert() },
+                                modifier = Modifier.size(28.dp),
+                            ) {
+                                Icon(Icons.Outlined.Close, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -1071,6 +1163,7 @@ private fun ResultView(
 
     val doneSteps = remember(run.id) { mutableStateListOf<Int>() }
     var urgentOpen by remember(run.id) { mutableStateOf(false) }
+    var expandedFlag by remember(run.id) { mutableStateOf<app.chaukas.ai.RedFlag?>(null) }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         // Main Verdict Card
@@ -1157,16 +1250,49 @@ private fun ResultView(
                     }
                 }
 
+                // Add to History
+                if (!vm.isSavedToHistory) {
+                    Button(
+                        onClick = {
+                            vm.saveCurrentRunToHistory()
+                            Toast.makeText(ctx, I18n.t("Saved to History", vm.language), Toast.LENGTH_SHORT).show()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Chaukas.Brand600, contentColor = Color.White),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Icon(Icons.Outlined.BookmarkAdd, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(I18n.t("Add to History", vm.language), fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Chaukas.Mint50,
+                        border = BorderStroke(1.dp, Chaukas.Mint600),
+                    ) {
+                        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Outlined.Check, null, tint = Chaukas.Mint700, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(I18n.t("Saved to History", vm.language), color = Chaukas.Mint700, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        }
+                    }
+                }
+
                 // Tell my circle
                 if (a.verdict != Verdict.SAFE && a.riskScore >= 65) {
                     Button(
-                        onClick = onTellCircle,
+                        onClick = {
+                            if (!vm.isSavedToHistory) {
+                                vm.saveCurrentRunToHistory()
+                            }
+                            onTellCircle()
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7A68DE), contentColor = Color.White),
                         shape = RoundedCornerShape(12.dp),
                     ) {
                         Icon(Icons.Outlined.Share, null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Tell my circle", fontWeight = FontWeight.Bold)
+                        Text(I18n.t("Tell my circle", vm.language), fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -1178,20 +1304,32 @@ private fun ResultView(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.WarningAmber, null, tint = Chaukas.Rose700)
                     Spacer(Modifier.width(8.dp))
-                    Text("Red flags", style = MaterialTheme.typography.titleMedium)
+                    Text(I18n.t("Red flags", vm.language), style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.width(8.dp))
                     Pill("${a.redFlags.size}", Chaukas.Rose50, Chaukas.Rose700)
                 }
                 Spacer(Modifier.height(10.dp))
                 a.redFlags.forEachIndexed { i, f ->
                     Surface(
+                        onClick = { expandedFlag = f },
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         shape = RoundedCornerShape(14.dp),
                         color = Chaukas.Rose50,
                         border = BorderStroke(1.dp, Chaukas.Rose100),
                     ) {
                         Column(Modifier.padding(14.dp)) {
-                            Text("${i + 1}. ${f.label}", fontWeight = FontWeight.Bold, color = Chaukas.Ink)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text("${i + 1}. ${f.label}", fontWeight = FontWeight.Bold, color = Chaukas.Ink, modifier = Modifier.weight(1f))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Outlined.Search, null, tint = Chaukas.Rose700, modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(I18n.t("Details", vm.language), fontSize = 11.sp, color = Chaukas.Rose700, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
                             if (f.evidence.isNotBlank()) {
                                 Spacer(Modifier.height(4.dp))
                                 Text("“${f.evidence}”", color = Chaukas.Rose700, fontFamily = FontFamily.Serif, fontSize = 14.sp)
@@ -1202,6 +1340,93 @@ private fun ResultView(
                     }
                 }
             }
+        }
+
+        // Expanded Red Flag Dialog ("vo bada ho kyu flag hua hai")
+        expandedFlag?.let { f ->
+            AlertDialog(
+                onDismissRequest = { expandedFlag = null },
+                confirmButton = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (!vm.isSavedToHistory) {
+                            Button(
+                                onClick = {
+                                    vm.saveCurrentRunToHistory()
+                                    Toast.makeText(ctx, I18n.t("Saved to History", vm.language), Toast.LENGTH_SHORT).show()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Chaukas.Brand600),
+                                shape = RoundedCornerShape(12.dp),
+                            ) {
+                                Icon(Icons.Outlined.BookmarkAdd, null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(I18n.t("Add to History", vm.language))
+                            }
+                        } else {
+                            Button(
+                                onClick = {
+                                    expandedFlag = null
+                                    onTellCircle()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7A68DE)),
+                                shape = RoundedCornerShape(12.dp),
+                            ) {
+                                Icon(Icons.Outlined.Share, null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(I18n.t("Tell my circle", vm.language))
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = { expandedFlag = null },
+                            shape = RoundedCornerShape(12.dp),
+                        ) {
+                            Text(I18n.t("Close", vm.language))
+                        }
+                    }
+                },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.WarningAmber, null, tint = Chaukas.Rose700, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(f.label, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    }
+                },
+                text = {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        if (f.evidence.isNotBlank()) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = Chaukas.Rose50,
+                                border = BorderStroke(1.dp, Chaukas.Rose100),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Column(Modifier.padding(10.dp)) {
+                                    Text("FLAGGED QUOTE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Chaukas.Rose700)
+                                    Spacer(Modifier.height(4.dp))
+                                    Text("“${f.evidence}”", fontFamily = FontFamily.Serif, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, color = Chaukas.Ink, fontSize = 13.sp)
+                                }
+                            }
+                            Spacer(Modifier.height(12.dp))
+                        }
+                        Text("Why this is flagged:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Chaukas.Ink)
+                        Spacer(Modifier.height(4.dp))
+                        Text(f.why, fontSize = 13.sp, color = Chaukas.Ink2, lineHeight = 18.sp)
+                        Spacer(Modifier.height(12.dp))
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Chaukas.Paper2,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(Modifier.padding(10.dp)) {
+                                Text("How scammers use this trick:", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Chaukas.Ink)
+                                Spacer(Modifier.height(3.dp))
+                                Text("Fraudsters use artificial urgency, threat of service disconnection, or fake authority to rush you into acting before checking. Legitimate banks and utilities never ask for OTPs or payments over random texted links.", fontSize = 12.sp, color = Chaukas.Ink2, lineHeight = 16.sp)
+                            }
+                        }
+                    }
+                },
+                shape = RoundedCornerShape(20.dp),
+                containerColor = Color.White,
+            )
         }
 
         // What to do now (interactive checklist)

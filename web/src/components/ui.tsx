@@ -18,9 +18,11 @@ export function Toasts() {
   return (
     <div className="toasts" role="status" aria-live="polite">
       {items.map((t) => (
-        <div key={t.id} className="toast">
-          <Icon name={t.icon} />
-          {t.text}
+        <div key={t.id} className={`toast toast-${t.icon}`}>
+          <span className="toast-icon-wrap">
+            <Icon name={t.icon} />
+          </span>
+          <span className="toast-text">{t.text}</span>
         </div>
       ))}
     </div>

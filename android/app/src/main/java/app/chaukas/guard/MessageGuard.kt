@@ -47,8 +47,8 @@ object MessageGuard {
     /** Shorter than this, a message is counted as checked but cannot carry a scam. */
     private const val MIN_SCAM_LENGTH = 12
 
-    /** Warn at "suspicious" or worse, the same line the app's verdict uses. */
-    const val THRESHOLD = 45
+    /** Warn at "suspicious" or worse (score >= 30), so any real fraud signal raises an alert. */
+    const val THRESHOLD = 30
 
     private val summary = Regex("""^\d+ (new )?messages?( from \d+ chats?)?$""", RegexOption.IGNORE_CASE)
 
@@ -83,19 +83,38 @@ object MessageGuard {
      * In Android SMS and WhatsApp notifications:
      * - Unsaved senders appear as raw phone numbers (e.g. "+91 98765 43210", "9876543210"),
      *   alphanumeric telecom headers (e.g. "BP-DHBVN", "VK-SBIINB", "AD-VIALRT"),
-     *   numeric shortcodes (e.g. "567676"), or generic labels ("Unknown", empty).
+     *   numeric shortcodes (e.g. "567676"), WhatsApp push names ("~Name"),
+     *   parenthesized numbers ("Name (+91 98765 43210)"), or generic labels ("Unknown", empty).
      * - Saved contacts appear as person names (e.g. "Mom", "Rahul Gupta", "Priya").
      */
     fun isUnsavedSender(from: String, isContactSavedLookup: ((String) -> Boolean)? = null): Boolean {
         val trimmed = from.trim()
         if (trimmed.isEmpty()) return true
 
-        // 1. If an external lookup (e.g. ContactsContract.PhoneLookup) confirms it is saved:
-        if (isContactSavedLookup != null && runCatching { isContactSavedLookup(trimmed) }.getOrDefault(false)) {
-            return false
+        // 1. WhatsApp prefix ~ denotes an unsaved push name (e.g. "~Anushka")
+        if (trimmed.startsWith("~")) return true
+
+        // 2. Embedded phone numbers in parentheses or string (e.g. "Anushka (+91 98765 43210)")
+        val phonePattern = Regex("""(\+?\d[\d -]{7,15}\d)""").find(trimmed)
+        if (phonePattern != null) {
+            val phoneDigits = phonePattern.value.filter { it.isDigit() }
+            if (phoneDigits.length in 7..16) {
+                if (isContactSavedLookup != null && runCatching { isContactSavedLookup(phoneDigits) }.getOrDefault(false)) {
+                    return false
+                }
+                return true
+            }
         }
 
-        // 2. Explicit unknown labels
+        // 3. If contact lookup confirms it is saved in phone contacts:
+        if (isContactSavedLookup != null) {
+            val isSaved = runCatching { isContactSavedLookup(trimmed) }.getOrDefault(false)
+            if (isSaved) return false
+            // When lookup was performed and contact is not in address book (e.g. deleted), it IS unsaved!
+            return true
+        }
+
+        // 4. Explicit unknown labels
         if (trimmed.equals("unknown", ignoreCase = true) ||
             trimmed.equals("unknown number", ignoreCase = true) ||
             trimmed.equals("unknown sender", ignoreCase = true)
@@ -103,18 +122,18 @@ object MessageGuard {
             return true
         }
 
-        // 3. SMS telecom headers: 2 letters, hyphen, 3-8 alphanumeric characters (e.g. BP-DHBVN, VK-SBIINB)
+        // 5. SMS telecom headers: 2 letters, hyphen, 3-8 alphanumeric characters (e.g. BP-DHBVN, VK-SBIINB)
         val smsHeader = Regex("""^[A-Za-z]{2}-[A-Za-z0-9]{3,8}$""", RegexOption.IGNORE_CASE)
         if (smsHeader.matches(trimmed)) return true
 
-        // 4. SMS shortcodes: 3 to 8 digits
+        // 6. SMS shortcodes: 3 to 8 digits
         val shortcode = Regex("""^\d{3,8}$""")
         if (shortcode.matches(trimmed)) return true
 
         val digits = trimmed.filter { it.isDigit() }
         val letters = trimmed.filter { it.isLetter() }
 
-        // 5. Phone numbers: starts with + or has 7-16 digits with minimal/no alphabetic letters
+        // 7. Phone numbers: starts with + or has 7-16 digits with minimal/no alphabetic letters
         if (trimmed.startsWith("+") && digits.length in 7..16) return true
         if (digits.length in 7..16 && letters.isEmpty()) return true
         if (digits.length in 7..16 && letters.length <= 1) return true

@@ -32,7 +32,9 @@ import app.chaukas.data.Repository
 import app.chaukas.data.applyClear
 import app.chaukas.data.applyDelete
 import app.chaukas.data.applySave
+import app.chaukas.guard.Guard
 import com.google.mlkit.vision.common.InputImage
+import kotlinx.coroutines.Dispatchers
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.devanagari.DevanagariTextRecognizerOptions
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -64,6 +66,26 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
     var language by mutableStateOf(prefs.getString("language", "English") ?: "English")
     var autoShareCircle by mutableStateOf(prefs.getBoolean("autoShareCircle", true))
     var isKnownContact by mutableStateOf(false)
+    var isSavedToHistory by mutableStateOf(false)
+
+    data class InAppAlert(
+        val title: String,
+        val message: String,
+        val score: Int? = null,
+        val from: String? = null,
+        val text: String? = null,
+        val isScam: Boolean = true,
+    )
+
+    var inAppAlert by mutableStateOf<InAppAlert?>(null)
+
+    fun showInAppAlert(title: String, message: String, score: Int? = null, from: String? = null, text: String? = null) {
+        inAppAlert = InAppAlert(title, message, score, from, text, (score ?: 0) >= 65)
+    }
+
+    fun dismissInAppAlert() {
+        inAppAlert = null
+    }
 
     private var tts: TextToSpeech? = null
     private val historyPrefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -84,6 +106,18 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
         }
         refreshModel()
         initTts(app)
+
+        Guard.onAlertCallback = { alert, appName, isKnown ->
+            viewModelScope.launch(Dispatchers.Main) {
+                showInAppAlert(
+                    title = if (isKnown) "Suspicious message from ${alert.from}" else (alert.reasons.firstOrNull() ?: "Scam alert"),
+                    message = alert.text,
+                    score = alert.score,
+                    from = if (alert.from.isNotBlank()) alert.from else appName,
+                    text = alert.text,
+                )
+            }
+        }
     }
 
     private fun initTts(ctx: Context) {
@@ -96,6 +130,7 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         super.onCleared()
+        Guard.onAlertCallback = null
         getApplication<Application>().getSharedPreferences("chaukas.local", Context.MODE_PRIVATE)
             .unregisterOnSharedPreferenceChangeListener(historyPrefsListener)
         tts?.stop()
@@ -265,15 +300,24 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val r = engine.analyze(text, mode, redact, emptyList(), language)
                 run = r
-                saveRun(r)
-                Repository.saveCheck(r)
-                if (!isKnownContact && autoShareCircle && r.analysis.verdict != Verdict.SAFE && r.analysis.riskScore >= 65) {
-                    runCatching { Repository.autoShareToCircles(r) }
-                }
+                isSavedToHistory = false
             } catch (e: Exception) {
                 error = e.message ?: "Something went wrong."
             } finally {
                 busy = false
+            }
+        }
+    }
+
+    fun saveCurrentRunToHistory() {
+        val r = run ?: return
+        if (isSavedToHistory) return
+        saveRun(r)
+        Repository.saveCheck(r)
+        isSavedToHistory = true
+        if (!isKnownContact && autoShareCircle && r.analysis.verdict != Verdict.SAFE && r.analysis.riskScore >= 65) {
+            viewModelScope.launch {
+                runCatching { Repository.autoShareToCircles(r) }
             }
         }
     }

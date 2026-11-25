@@ -46,7 +46,17 @@ function speak(run: AnalysisRun) {
   speechSynthesis.speak(u);
 }
 
-export function Result({ run, onChange }: { run: AnalysisRun; onChange?: (r: AnalysisRun) => void }) {
+export function Result({
+  run,
+  onChange,
+  savedToHistory = true,
+  onSaveToHistory,
+}: {
+  run: AnalysisRun;
+  onChange?: (r: AnalysisRun) => void;
+  savedToHistory?: boolean;
+  onSaveToHistory?: (r?: AnalysisRun) => void;
+}) {
   const a = run.analysis;
   const rc = rcStore.use();
   const settings = settingsStore.use();
@@ -57,6 +67,7 @@ export function Result({ run, onChange }: { run: AnalysisRun; onChange?: (r: Ana
   const [cardOpen, setCardOpen] = useState(false);
   const [opinionBusy, setOpinionBusy] = useState(false);
   const [opinionErr, setOpinionErr] = useState<string | null>(null);
+  const [expandedFlag, setExpandedFlag] = useState<typeof a.redFlags[0] | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -140,8 +151,26 @@ export function Result({ run, onChange }: { run: AnalysisRun; onChange?: (r: Ana
               <Icon name="message" /> {t('Send to WhatsApp')}
             </a>
           )}
+          {!savedToHistory ? (
+            <button className="btn sm primary" onClick={() => onSaveToHistory?.(run)}>
+              <Icon name="bookmark" /> {t('Add to History')}
+            </button>
+          ) : (
+            <span className="badge mint sm">
+              <Icon name="check" /> {t('Saved to History')}
+            </span>
+          )}
           {isShareable(a) && (
-            <button className="btn sm tell-circle" onClick={() => setSharing(true)}>
+            <button
+              className="btn sm tell-circle"
+              onClick={() => {
+                if (!savedToHistory) {
+                  onSaveToHistory?.(run);
+                }
+                setSharing(true);
+              }}
+              title={!savedToHistory ? t('Saves to history and shares with your circle') : t('Tell my circle')}
+            >
               <Icon name="share" /> {t('Tell my circle')}
             </button>
           )}
@@ -193,8 +222,19 @@ export function Result({ run, onChange }: { run: AnalysisRun; onChange?: (r: Ana
           ) : (
             <ol className="flags">
               {a.redFlags.map((f, i) => (
-                <li key={i} style={{ animationDelay: `${i * 70}ms` }}>
-                  <div className="flag-label">{f.label}</div>
+                <li
+                  key={i}
+                  style={{ animationDelay: `${i * 70}ms`, cursor: 'pointer' }}
+                  className="flag-clickable"
+                  onClick={() => setExpandedFlag(f)}
+                  title={t('Click to see why it was flagged in detail')}
+                >
+                  <div className="row between items-center">
+                    <div className="flag-label">{f.label}</div>
+                    <span className="xs subtle" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Icon name="search" /> {t('Details')}
+                    </span>
+                  </div>
                   {f.evidence && <q className="flag-ev">{f.evidence}</q>}
                   <div className="flag-why">{f.why}</div>
                 </li>
@@ -252,6 +292,74 @@ export function Result({ run, onChange }: { run: AnalysisRun; onChange?: (r: Ana
             </p>
             <pre className="receipt">{run.sentToCloud}</pre>
             <button className="btn primary" onClick={() => setShowSent(false)}>Done</button>
+          </div>
+        </Modal>
+      )}
+      {expandedFlag && (
+        <Modal label={expandedFlag.label} onClose={() => setExpandedFlag(null)}>
+          <div className="stack" style={{ gap: 16 }}>
+            <div className="row between items-center">
+              <span className="badge rose">
+                <Icon name="alert" /> {t('Red Flag Detailed Breakdown')}
+              </span>
+              <span className="eyebrow">{CATEGORY_LABEL[a.category]}</span>
+            </div>
+            <h3 className="display" style={{ fontSize: 'var(--fs-xl)' }}>{expandedFlag.label}</h3>
+            {expandedFlag.evidence && (
+              <div style={{ background: 'var(--paper-2)', padding: '12px 16px', borderRadius: 12, borderLeft: '4px solid var(--rose-600)' }}>
+                <span className="xs subtle" style={{ fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                  {t('Flagged message quote')}
+                </span>
+                <blockquote style={{ margin: 0, fontStyle: 'italic', fontSize: 'var(--fs-md)', color: 'var(--ink)' }}>
+                  “{expandedFlag.evidence}”
+                </blockquote>
+              </div>
+            )}
+            <div>
+              <h4 style={{ fontWeight: 600, fontSize: 'var(--fs-sm)', marginBottom: 6 }}>{t('Why this was flagged:')}</h4>
+              <p style={{ margin: 0, color: 'var(--ink-2)', lineHeight: 1.5 }}>{expandedFlag.why}</p>
+              <div style={{ marginTop: 12, padding: '12px 14px', borderRadius: 10, background: 'rgba(201, 75, 54, 0.08)', border: '1px solid rgba(201, 75, 54, 0.15)' }}>
+                <b style={{ color: 'var(--rose-700)', fontSize: 'var(--fs-sm)', display: 'block', marginBottom: 4 }}>
+                  {t('How scammers use this trick')}
+                </b>
+                <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--ink-2)', lineHeight: 1.4, display: 'block' }}>
+                  {t('Fraudsters use urgent pressure, threats of suspension, or fake rewards to rush you into acting before checking. Legitimate banks and services never ask for OTPs or payments via random texted links.')}
+                </span>
+              </div>
+            </div>
+            <hr className="divider" />
+            <div className="row wrap between items-center" style={{ gap: 10 }}>
+              <div className="row items-center" style={{ gap: 8 }}>
+                {!savedToHistory ? (
+                  <button
+                    className="btn primary"
+                    onClick={() => {
+                      onSaveToHistory?.(run);
+                    }}
+                  >
+                    <Icon name="bookmark" /> {t('Add to History')}
+                  </button>
+                ) : (
+                  <span className="badge mint">
+                    <Icon name="check" /> {t('Saved to History')}
+                  </span>
+                )}
+                <button
+                  className="btn tell-circle"
+                  disabled={!savedToHistory}
+                  onClick={() => {
+                    setExpandedFlag(null);
+                    setSharing(true);
+                  }}
+                  title={!savedToHistory ? t('Add to History first to share with circle') : ''}
+                >
+                  <Icon name="share" /> {t('Tell my circle')}
+                </button>
+              </div>
+              <button className="btn ghost" onClick={() => setExpandedFlag(null)}>
+                {t('Close')}
+              </button>
+            </div>
           </div>
         </Modal>
       )}

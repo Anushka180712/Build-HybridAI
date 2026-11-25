@@ -72,6 +72,7 @@ class GuardService : NotificationListenerService() {
             Log.i(TAG, "warned: score=${alert.score}")
             val isUnsaved = MessageGuard.isUnsavedSender(from) { Guard.isContactSaved(this, it) }
             Guard.warn(this, alert, key.hashCode(), isKnownContact = !isUnsaved)
+            Guard.onAlertCallback?.invoke(alert, appName(sbn.packageName), !isUnsaved)
             if (alert.score >= Guard.SCAM_AT && isUnsaved) {
                 Guard.onScamDetected(this, appName(sbn.packageName), kind, alert)
             }
@@ -136,6 +137,9 @@ object Guard {
     private const val PREFS = "chaukas.guard"
     private const val CHANNEL = "scam_warnings"
     const val ACTION_CHECK = "app.chaukas.CHECK"
+
+    /** Callback invoked when an alert is detected so an in-app banner can be displayed if app is foreground. */
+    var onAlertCallback: ((GuardAlert, String, Boolean) -> Unit)? = null
 
     fun isOn(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("on", true)
 
@@ -349,6 +353,7 @@ object Guard {
         record(ctx, app, kind, alert)
         val isUnsaved = MessageGuard.isUnsavedSender(from) { isContactSaved(ctx, it) }
         warn(ctx, alert, (System.currentTimeMillis() % 10000).toInt() + 100, isKnownContact = !isUnsaved)
+        onAlertCallback?.invoke(alert, app, !isUnsaved)
         if (alert.score >= SCAM_AT && isUnsaved) {
             onScamDetected(ctx, app, kind, alert)
         }
@@ -397,24 +402,43 @@ object Guard {
 
     /**
      * Checks if the sender string matches a saved contact in the phone's contacts database,
-     * if READ_CONTACTS permission has been granted.
+     * if READ_CONTACTS permission has been granted. Checks both phone numbers and display names.
      */
     fun isContactSaved(ctx: Context, from: String): Boolean {
         if (ctx.checkSelfPermission(android.Manifest.permission.READ_CONTACTS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             return false
         }
-        val clean = from.trim()
+        val clean = from.trim().removePrefix("~").trim()
         if (clean.isBlank()) return false
+
+        // Check by phone number if digits exist
+        val digits = clean.filter { it.isDigit() }
+        if (digits.length in 7..16) {
+            val phoneMatch = runCatching {
+                val uri = android.net.Uri.withAppendedPath(
+                    android.provider.ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                    android.net.Uri.encode(digits),
+                )
+                ctx.contentResolver.query(
+                    uri,
+                    arrayOf(android.provider.ContactsContract.PhoneLookup.DISPLAY_NAME),
+                    null,
+                    null,
+                    null,
+                )?.use { cursor ->
+                    cursor.moveToFirst()
+                } ?: false
+            }.getOrDefault(false)
+            if (phoneMatch) return true
+        }
+
+        // Also check by contact name in ContactsContract.Contacts
         return runCatching {
-            val uri = android.net.Uri.withAppendedPath(
-                android.provider.ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
-                android.net.Uri.encode(clean),
-            )
             ctx.contentResolver.query(
-                uri,
-                arrayOf(android.provider.ContactsContract.PhoneLookup.DISPLAY_NAME),
-                null,
-                null,
+                android.provider.ContactsContract.Contacts.CONTENT_URI,
+                arrayOf(android.provider.ContactsContract.Contacts._ID),
+                "${android.provider.ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} = ? COLLATE NOCASE",
+                arrayOf(clean),
                 null,
             )?.use { cursor ->
                 cursor.moveToFirst()

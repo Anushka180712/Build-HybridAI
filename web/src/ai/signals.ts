@@ -120,15 +120,15 @@ PHRASES.push(
     id: 'india_kyc',
     label: 'KYC, PAN or Aadhaar "update"',
     detail: 'Banks never block your account over a texted KYC link or ask for your OTP.',
-    weight: 22,
-    re: /\b(kyc|e-?kyc|pan( card)?|aadhaa?r)\b.{0,40}\b(update|expired?|blocked?|suspend|verify|link)/gi,
+    weight: 26,
+    re: /\b(kyc|e-?kyc|pan( card)?|aadhaa?r|sbi|yono|hdfc|icici|pnb|axis|bank account|khata)\b.{0,45}\b(update|updat(ed|ion)|expire[ds]?|block(ed)?|suspend(ed|ion)?|verify|link|deactivat(ed|ion)|hold)\b/gi,
   },
   {
     id: 'upi_pin',
     label: 'UPI PIN or collect request',
     detail: 'You never need your UPI PIN to receive money. Entering it always sends money.',
     weight: 26,
-    re: /\b(upi pin|collect request|enter (your )?pin|scan (this|the) qr|sent .{0,20} by mistake)\b/gi,
+    re: /\b(upi pin|collect request|enter (your )?pin|scan (this|the) qr|sent .{0,25} by mistake|galti se .{0,20}(bhej|paise)|wapas (kare|bhejo|karo)|approve request|cashback (approved|refund))\b/gi,
   },
   {
     id: 'upi_qr',
@@ -148,8 +148,15 @@ PHRASES.push(
     id: 'power_cut',
     label: 'Power cut threat',
     detail: 'Electricity boards do not text you a personal number to avoid disconnection tonight.',
-    weight: 20,
-    re: /\b(electricity|power|light) (will be |connection will be )?(disconnected|cut)\b/gi,
+    weight: 26,
+    re: /\b(electricity|power|light|bijli|current|bill).{0,35}(disconnect(ed)?|cut|suspended|off|unpaid|pending|baki|officer|9\.\d{2} ?(pm|am))\b/gi,
+  },
+  {
+    id: 'call_officer',
+    label: 'Contact officer / mobile number',
+    detail: 'Scammers tell you to urgently call a personal mobile number pretending to be an officer.',
+    weight: 22,
+    re: /\b(contact|call|officer|dial|sampark (kare|kariye|karo)|helpline).{0,30}(\+?91|0)?[6-9]\d{9}\b/gi,
   },
 );
 
