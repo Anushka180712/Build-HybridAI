@@ -55,13 +55,76 @@ class MessageGuardTest {
     @Test fun sortsAppsIntoSmsAndWhatsApp() {
         assertEquals("chat", MessageGuard.kind("com.whatsapp"))
         assertEquals("chat", MessageGuard.kind("com.whatsapp.w4b"))
+        assertEquals("chat", MessageGuard.kind("com.whatsapp.clone"))
         assertEquals("sms", MessageGuard.kind("com.google.android.apps.messaging"))
+        assertEquals("sms", MessageGuard.kind("com.oneplus.mms"))
+        assertEquals("sms", MessageGuard.kind("com.coloros.mms"))
+        assertEquals("sms", MessageGuard.kind("com.vivo.mms"))
         assertEquals("sms", MessageGuard.kind("com.oem.sms", setOf("com.oem.sms")))
         assertNull(MessageGuard.kind("com.example.game"))
+    }
+
+    @Test fun testScamMessagesAreDetected() {
+        val smsScam = Guard.TEST_SCAM_SMS
+        val chatScam = Guard.TEST_SCAM_CHAT
+        val smsAlert = MessageGuard.assess("com.google.android.apps.messaging", "BP-DHBVN", smsScam)
+        assertNotNull(smsAlert)
+        assertTrue(smsAlert!!.score >= 70)
+        assertTrue(smsAlert.reasons.isNotEmpty())
+
+        val chatAlert = MessageGuard.assess(whatsapp, "+91 98765 43210", chatScam)
+        assertNotNull(chatAlert)
+        assertTrue(chatAlert!!.score >= 70)
+        assertTrue(chatAlert.reasons.isNotEmpty())
+    }
+
+    @Test fun isSummaryHelperIdentifiesSummaries() {
+        assertTrue(MessageGuard.isSummary("2 new messages"))
+        assertTrue(MessageGuard.isSummary("5 new messages from 2 chats"))
+        assertTrue(MessageGuard.isSummary("1 new message"))
+        assertTrue(!MessageGuard.isSummary("Your electricity will be disconnected tonight"))
     }
 
     @Test fun shortMessagesAreCountedButNeverWarned() {
         assertTrue(MessageGuard.checkable(whatsapp, "hi"))
         assertNull(MessageGuard.assess(whatsapp, "Maa", "OTP now!"))
+    }
+
+    @Test fun identifiesUnsavedSendersVersusSavedContacts() {
+        // Unknown / unsaved phone numbers
+        assertTrue(MessageGuard.isUnsavedSender("+91 98765 43210"))
+        assertTrue(MessageGuard.isUnsavedSender("+919876543210"))
+        assertTrue(MessageGuard.isUnsavedSender("9876543210"))
+        assertTrue(MessageGuard.isUnsavedSender("+1 (555) 234-5678"))
+        assertTrue(MessageGuard.isUnsavedSender("+44 7911 123456"))
+
+        // SMS telecom sender headers & shortcodes
+        assertTrue(MessageGuard.isUnsavedSender("BP-DHBVN"))
+        assertTrue(MessageGuard.isUnsavedSender("VK-SBIINB"))
+        assertTrue(MessageGuard.isUnsavedSender("AX-AIRTEL"))
+        assertTrue(MessageGuard.isUnsavedSender("567676"))
+        assertTrue(MessageGuard.isUnsavedSender("1901"))
+
+        // Blank or explicit unknown
+        assertTrue(MessageGuard.isUnsavedSender(""))
+        assertTrue(MessageGuard.isUnsavedSender("Unknown"))
+        assertTrue(MessageGuard.isUnsavedSender("Unknown number"))
+        assertTrue(MessageGuard.isUnsavedSender("Unknown Sender"))
+
+        // Saved contact names should return false (not unsaved)
+        org.junit.Assert.assertFalse(MessageGuard.isUnsavedSender("Mom"))
+        org.junit.Assert.assertFalse(MessageGuard.isUnsavedSender("Papa"))
+        org.junit.Assert.assertFalse(MessageGuard.isUnsavedSender("Rohan Gupta"))
+        org.junit.Assert.assertFalse(MessageGuard.isUnsavedSender("Priya Sharma"))
+        org.junit.Assert.assertFalse(MessageGuard.isUnsavedSender("Dr. Mehta"))
+        org.junit.Assert.assertFalse(MessageGuard.isUnsavedSender("Aunt Sunita"))
+
+        // Lookup callback confirming saved contact returns false
+        org.junit.Assert.assertFalse(
+            MessageGuard.isUnsavedSender("+91 98765 43210", isContactSavedLookup = { true }),
+        )
+        assertTrue(
+            MessageGuard.isUnsavedSender("+91 98765 43210", isContactSavedLookup = { false }),
+        )
     }
 }

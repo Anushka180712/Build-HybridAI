@@ -14,6 +14,7 @@ class ChaukasApp : Application() {
     override fun onCreate() {
         super.onCreate()
         Firebase.initialize(context = this)
+        app.chaukas.guard.Guard.initChannels(this)
         // App Check is required for Firebase AI Logic. Debug builds use the
         // debug provider (register the token shown on the Engine screen); release
         // builds use Play Integrity.

@@ -10,6 +10,7 @@ import { createStore } from '../lib/store';
 import { rcStore } from '../lib/appState';
 import { Icon } from '../components/Icon';
 import { SourceBadge } from '../components/ui';
+import { useT } from '../lib/i18n';
 
 const THEMES = [
   'a parcel delivery',
@@ -54,16 +55,21 @@ const RANKS = [
 ];
 
 export function DojoView() {
+  const t = useT();
   const stats = dojoStore.use();
   const rc = rcStore.use();
-  const mode = settingsStore.use().mode;
+  const settings = settingsStore.use();
+  const lang = settings.language;
   const [round, setRound] = useState<DojoRound | null>(null);
   const [guess, setGuess] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const next = useRef<Promise<DojoRound> | null>(null);
 
-  const fetchRound = useCallback(() => generateDojoRound(randomBrief(), mode === 'private' ? 'private' : 'smart'), [mode]);
+  const fetchRound = useCallback(
+    () => generateDojoRound({ ...randomBrief(), language: lang }, settings.mode === 'private' ? 'private' : 'smart'),
+    [settings.mode, lang]
+  );
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -107,7 +113,7 @@ export function DojoView() {
   if (!rc.dojoEnabled) {
     return (
       <div className="page">
-        <div className="card empty"><h3>Scam Dojo is resting</h3><p className="small">Practice rounds are paused right now. Check back soon.</p></div>
+        <div className="card empty"><h3>{t('Scam Dojo is resting')}</h3><p className="small">{t('Practice rounds are paused right now. Check back soon.')}</p></div>
       </div>
     );
   }
@@ -116,8 +122,8 @@ export function DojoView() {
     <div className="page">
       <header className="page-head">
         <div>
-          <span className="eyebrow">Practice makes you scam-proof</span>
-          <h1 className="display page-title">Scam Dojo</h1>
+          <span className="eyebrow">{t('Practice makes you scam-proof')}</span>
+          <h1 className="display page-title">{t('Scam Dojo')}</h1>
         </div>
       </header>
 
@@ -125,16 +131,16 @@ export function DojoView() {
         <div className="rank">
           <span className="rank-badge"><Icon name="target" /></span>
           <div className="grow">
-            <b>{rank.name}</b>
+            <b>{t(rank.name)}</b>
             <div className="progress" style={{ marginTop: 6 }}>
               <i style={{ width: `${nextRank ? ((stats.correct - rank.at) / (nextRank.at - rank.at)) * 100 : 100}%` }} />
             </div>
-            <span className="xs subtle">{nextRank ? `${nextRank.at - stats.correct} more to ${nextRank.name}` : 'Top rank reached'}</span>
+            <span className="xs subtle">{nextRank ? `${nextRank.at - stats.correct} ${t('more to')} ${t(nextRank.name)}` : t('Top rank reached')}</span>
           </div>
         </div>
-        <div className="mini-stat"><span className="display">{stats.streak}</span><span>streak <Icon name="flame" /></span></div>
-        <div className="mini-stat"><span className="display">{stats.played ? Math.round((stats.correct / stats.played) * 100) : 0}%</span><span>accuracy</span></div>
-        <div className="mini-stat"><span className="display">{stats.best}</span><span>best</span></div>
+        <div className="mini-stat"><span className="display">{stats.streak}</span><span>{t('streak')} <Icon name="flame" /></span></div>
+        <div className="mini-stat"><span className="display">{stats.played ? Math.round((stats.correct / stats.played) * 100) : 0}%</span><span>{t('accuracy')}</span></div>
+        <div className="mini-stat"><span className="display">{stats.best}</span><span>{t('best')}</span></div>
       </section>
 
       <section className="dojo-stage">
@@ -143,7 +149,7 @@ export function DojoView() {
             <span className="phone-avatar">{round?.sender.charAt(0) ?? '·'}</span>
             <div className="grow">
               <b className="small">{busy ? '…' : round?.sender}</b>
-              <div className="xs subtle">{round?.brief.channel ?? ''}</div>
+              <div className="xs subtle">{round?.brief.channel ? t(round.brief.channel) : ''}</div>
             </div>
           </div>
           <div className="phone-body">
@@ -161,36 +167,36 @@ export function DojoView() {
 
         <div className="dojo-side">
           {error ? (
-            <div className="callout err"><Icon name="alert" /><div>{error}<div style={{ marginTop: 8 }}><button className="btn sm" onClick={load}>Try again</button></div></div></div>
+            <div className="callout err"><Icon name="alert" /><div>{error}<div style={{ marginTop: 8 }}><button className="btn sm" onClick={load}>{t('Try again')}</button></div></div></div>
           ) : guess === null ? (
             <>
-              <h2 className="display" style={{ fontSize: 'var(--fs-2xl)' }}>Scam, or the real thing?</h2>
-              <p className="muted">Read it like you would on your phone. Trust your gut, then see how you did.</p>
+              <h2 className="display" style={{ fontSize: 'var(--fs-2xl)' }}>{t('Scam, or the real thing?')}</h2>
+              <p className="muted">{t('Read it like you would on your phone. Trust your gut, then see how you did.')}</p>
               <div className="guess">
                 <button className="guess-btn scam" disabled={busy || !round} onClick={() => answer(true)}>
-                  <Icon name="shield" /> Scam
+                  <Icon name="shield" /> {t('Scam')}
                 </button>
                 <button className="guess-btn legit" disabled={busy || !round} onClick={() => answer(false)}>
-                  <Icon name="check" /> Legit
+                  <Icon name="check" /> {t('Legit')}
                 </button>
               </div>
-              {round && <span className="xs subtle row" style={{ gap: 6 }}>Written by <SourceBadge source={round.source} /></span>}
+              {round && <span className="xs subtle row" style={{ gap: 6 }}>{t('Written by')} <SourceBadge source={round.source} /></span>}
             </>
           ) : (
             round && (
               <div className={`reveal ${right ? 'ok' : 'nope'}`}>
-                <span className="reveal-tag">{right ? 'Nice catch!' : 'Not quite'}</span>
-                <h2 className="display">{round.brief.isScam ? 'This was a scam' : 'This one was legit'}</h2>
+                <span className="reveal-tag">{right ? t('Nice catch!') : t('Not quite')}</span>
+                <h2 className="display">{round.brief.isScam ? t('This was a scam') : t('This one was legit')}</h2>
                 <p>{round.explanation}</p>
                 {round.tells.length > 0 && (
                   <ul className="tells">
-                    {round.tells.map((t, i) => (
-                      <li key={i}><Icon name="eye" />{t}</li>
+                    {round.tells.map((tell, i) => (
+                      <li key={i}><Icon name="eye" />{tell}</li>
                     ))}
                   </ul>
                 )}
                 <button className="btn primary" onClick={load}>
-                  Next message <Icon name="arrowRight" />
+                  {t('Next message')} <Icon name="arrowRight" />
                 </button>
               </div>
             )

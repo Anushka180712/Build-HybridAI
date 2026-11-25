@@ -23,6 +23,16 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import app.chaukas.MainActivity
 import app.chaukas.R
+import app.chaukas.ai.Analysis
+import app.chaukas.ai.AnalysisRun
+import app.chaukas.ai.RedFlag
+import app.chaukas.ai.Source
+import app.chaukas.ai.Verdict
+import app.chaukas.data.LocalHistory
+import app.chaukas.data.Repository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class GuardService : NotificationListenerService() {
     private val seen = LinkedHashSet<String>()
@@ -45,10 +55,9 @@ class GuardService : NotificationListenerService() {
     private fun check(sbn: StatusBarNotification) {
         if (!Guard.isOn(this) || sbn.packageName == packageName) return
         val n = sbn.notification
-        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
-        val extras = n.extras
-        val text = latestMessage(n) ?: (extras.getCharSequence(Notification.EXTRA_BIG_TEXT) ?: extras.getCharSequence(Notification.EXTRA_TEXT))?.toString() ?: return
-        val from = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
+        val text = extractMessageText(n) ?: return
+        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0 && MessageGuard.isSummary(text)) return
+        val from = extractSender(n)
         val watched = setOfNotNull(Telephony.Sms.getDefaultSmsPackage(this))
         val kind = MessageGuard.kind(sbn.packageName, watched) ?: return
         if (!Guard.watches(this, kind)) return
@@ -61,7 +70,11 @@ class GuardService : NotificationListenerService() {
         Guard.record(this, appName(sbn.packageName), kind, alert)
         if (alert != null) {
             Log.i(TAG, "warned: score=${alert.score}")
-            Guard.warn(this, alert, key.hashCode())
+            val isUnsaved = MessageGuard.isUnsavedSender(from) { Guard.isContactSaved(this, it) }
+            Guard.warn(this, alert, key.hashCode(), isKnownContact = !isUnsaved)
+            if (alert.score >= Guard.SCAM_AT && isUnsaved) {
+                Guard.onScamDetected(this, appName(sbn.packageName), kind, alert)
+            }
         } else if (Guard.showSafe(this)) {
             Guard.safeNote(this, appName(sbn.packageName))
         }
@@ -86,10 +99,33 @@ class GuardService : NotificationListenerService() {
         packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
     }.getOrDefault(pkg.substringAfterLast('.'))
 
-    /** WhatsApp and Messages use MessagingStyle; the newest line is the one that just arrived. */
-    private fun latestMessage(n: Notification): String? {
-        val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(n) ?: return null
-        return style.messages.lastOrNull()?.text?.toString()
+    /** Robustly extracts message text from MessagingStyle, BigText, Inbox lines, or standard text. */
+    private fun extractMessageText(n: Notification): String? {
+        val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(n)
+        val styleMsg = style?.messages?.lastOrNull { !it.text.isNullOrBlank() }?.text?.toString()?.trim()
+        if (!styleMsg.isNullOrBlank() && !MessageGuard.isSummary(styleMsg)) return styleMsg
+
+        val extras = n.extras ?: return null
+
+        val big = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()?.trim()
+        if (!big.isNullOrBlank() && !MessageGuard.isSummary(big)) return big
+
+        val lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+        val lastLine = lines?.lastOrNull { !it.isNullOrBlank() }?.toString()?.trim()
+        if (!lastLine.isNullOrBlank() && !MessageGuard.isSummary(lastLine)) return lastLine
+
+        val txt = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim()
+        if (!txt.isNullOrBlank() && !MessageGuard.isSummary(txt)) return txt
+
+        return if (!big.isNullOrBlank()) big else txt
+    }
+
+    private fun extractSender(n: Notification): String {
+        val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(n)
+        val person = style?.messages?.lastOrNull { !it.text.isNullOrBlank() }?.person?.name?.toString()
+        if (!person.isNullOrBlank()) return person
+        val extras = n.extras ?: return ""
+        return extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
     }
 
     private companion object { const val TAG = "ChaukasGuard" }
@@ -101,13 +137,29 @@ object Guard {
     private const val CHANNEL = "scam_warnings"
     const val ACTION_CHECK = "app.chaukas.CHECK"
 
-    fun isOn(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("on", false)
+    fun isOn(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("on", true)
 
     fun setOn(ctx: Context, on: Boolean) =
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("on", on).apply()
 
     private const val SAFE_CHANNEL = "checked_safe"
     private const val SAFE_ID = 1930
+
+    fun initChannels(ctx: Context) {
+        val nm = ctx.getSystemService(NotificationManager::class.java) ?: return
+        val scamChannel = NotificationChannel(CHANNEL, "Scam warnings", NotificationManager.IMPORTANCE_HIGH).apply {
+            description = "A heads-up when a new message looks like a scam"
+            enableVibration(true)
+            enableLights(true)
+        }
+        val safeChannel = NotificationChannel(SAFE_CHANNEL, "Checked, looks fine", NotificationManager.IMPORTANCE_MIN).apply {
+            description = "A silent note when a new message was checked and showed no scam signs"
+        }
+        val testChannel = NotificationChannel(TEST_CHANNEL, "Self-test", NotificationManager.IMPORTANCE_LOW).apply {
+            description = "A test message to check that automatic warnings work"
+        }
+        nm.createNotificationChannels(listOf(scamChannel, safeChannel, testChannel))
+    }
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -273,19 +325,61 @@ object Guard {
         } catch (_: Exception) { /* nothing to open */ }
     }
 
-    fun warn(ctx: Context, alert: GuardAlert, id: Int) {
+    const val TEST_SCAM_SMS = "URGENT: Your electricity power will be disconnected tonight at 9:30 PM due to unpaid bill. Immediately call officer at 9876543210 or update bill: http://bit.ly/dhbvn-pay"
+    const val TEST_SCAM_CHAT = "SBI Alert: Your KYC has expired and your account is blocked. Update immediately by entering your OTP at http://sbi-kyc.top/verify or contact us on Telegram."
+
+    /**
+     * Simulates receiving a high-risk scam message to test the notification warning and scanner flow.
+     */
+    fun simulateTestAlert(ctx: Context, kind: String = "sms"): Boolean {
+        setOn(ctx, true)
+        val text = if (kind == "sms") TEST_SCAM_SMS else TEST_SCAM_CHAT
+        val app = if (kind == "sms") "Messages" else "WhatsApp"
+        val from = if (kind == "sms") "BP-DHBVN" else "+91 98765 43210"
+        val alert = MessageGuard.assess(
+            if (kind == "sms") "com.google.android.apps.messaging" else "com.whatsapp",
+            from,
+            text,
+        ) ?: GuardAlert(
+            score = 86,
+            reasons = listOf("Threat of power cut", "Suspicious link"),
+            text = text,
+            from = from,
+        )
+        record(ctx, app, kind, alert)
+        val isUnsaved = MessageGuard.isUnsavedSender(from) { isContactSaved(ctx, it) }
+        warn(ctx, alert, (System.currentTimeMillis() % 10000).toInt() + 100, isKnownContact = !isUnsaved)
+        if (alert.score >= SCAM_AT && isUnsaved) {
+            onScamDetected(ctx, app, kind, alert)
+        }
+        return true
+    }
+
+    fun warn(ctx: Context, alert: GuardAlert, id: Int, isKnownContact: Boolean = false) {
         val nm = ctx.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel(CHANNEL, "Scam warnings", NotificationManager.IMPORTANCE_HIGH).apply {
             description = "A heads-up when a new message looks like a scam"
+            enableVibration(true)
+            enableLights(true)
         })
         val open = Intent(ctx, MainActivity::class.java)
             .setAction(ACTION_CHECK)
             .putExtra(Intent.EXTRA_TEXT, alert.text)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val pending = PendingIntent.getActivity(ctx, id, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        val title = if (alert.score >= 70) "This message looks like a scam" else "Be careful with this message"
-        val who = if (alert.from.isNotBlank()) "From ${alert.from}. " else ""
-        val body = "$who${alert.reasons.joinToString(" · ")}. Don't tap links or share codes. Tap for a full check."
+        val title = if (isKnownContact) {
+            "⚠️ Red flags in message from ${alert.from}"
+        } else if (alert.score >= 70) {
+            "This message looks like a scam"
+        } else {
+            "Be careful with this message"
+        }
+        val body = if (isKnownContact) {
+            "Why it's flagged: ${alert.reasons.joinToString(" · ")}. Their phone or account may be compromised. Don't send money or tap links."
+        } else {
+            val who = if (alert.from.isNotBlank()) "From ${alert.from}. " else ""
+            "$who${alert.reasons.joinToString(" · ")}. Don't tap links or share codes. Tap for a full check."
+        }
         val notification = NotificationCompat.Builder(ctx, CHANNEL)
             .setSmallIcon(R.drawable.ic_chaukas)
             .setContentTitle(title)
@@ -293,10 +387,106 @@ object Guard {
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setColor(0xFFC94B36.toInt())
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(pending)
             .setAutoCancel(true)
             .build()
         runCatching { NotificationManagerCompat.from(ctx).notify(id, notification) }
+    }
+
+    /**
+     * Checks if the sender string matches a saved contact in the phone's contacts database,
+     * if READ_CONTACTS permission has been granted.
+     */
+    fun isContactSaved(ctx: Context, from: String): Boolean {
+        if (ctx.checkSelfPermission(android.Manifest.permission.READ_CONTACTS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            return false
+        }
+        val clean = from.trim()
+        if (clean.isBlank()) return false
+        return runCatching {
+            val uri = android.net.Uri.withAppendedPath(
+                android.provider.ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                android.net.Uri.encode(clean),
+            )
+            ctx.contentResolver.query(
+                uri,
+                arrayOf(android.provider.ContactsContract.PhoneLookup.DISPLAY_NAME),
+                null,
+                null,
+                null,
+            )?.use { cursor ->
+                cursor.moveToFirst()
+            } ?: false
+        }.getOrDefault(false)
+    }
+
+    /**
+     * Automatically records a high-risk scam (score >= 65) from an unsaved sender to on-device history
+     * and shares it to Family Circle groups so family members are alerted.
+     */
+    fun onScamDetected(ctx: Context, app: String, kind: String, alert: GuardAlert) {
+        val category = when {
+            alert.reasons.any { it.contains("electricity", ignoreCase = true) || it.contains("bill", ignoreCase = true) || it.contains("power", ignoreCase = true) } -> "delivery_fee"
+            alert.reasons.any { it.contains("kyc", ignoreCase = true) || it.contains("bank", ignoreCase = true) || it.contains("account", ignoreCase = true) || it.contains("otp", ignoreCase = true) } -> "bank_or_payment"
+            alert.reasons.any { it.contains("lottery", ignoreCase = true) || it.contains("prize", ignoreCase = true) || it.contains("win", ignoreCase = true) } -> "prize_lottery"
+            alert.reasons.any { it.contains("tax", ignoreCase = true) || it.contains("police", ignoreCase = true) || it.contains("court", ignoreCase = true) } -> "government_tax"
+            alert.reasons.any { it.contains("job", ignoreCase = true) || it.contains("salary", ignoreCase = true) } -> "job_offer"
+            else -> "phishing"
+        }
+
+        val senderDesc = if (alert.from.isNotBlank()) "from ${alert.from}" else "via $app"
+        val summary = "Auto-detected scam $senderDesc: ${alert.reasons.joinToString(", ")}. Risk score: ${alert.score}%."
+
+        val redFlags = alert.reasons.map { reason ->
+            RedFlag(
+                label = reason,
+                evidence = if (alert.from.isNotBlank()) alert.from else app,
+                why = "Auto-detected from $app notification from unknown number: $reason",
+            )
+        }
+
+        val nextSteps = listOf(
+            "Do not tap any links or call numbers sent in this message.",
+            "Never share OTP, passwords, UPI PIN, or bank card details.",
+            "Block and report the sender in $app.",
+            "Report cyber fraud at cybercrime.gov.in or helpline 1930 if funds were sent.",
+        )
+
+        val run = AnalysisRun(
+            id = java.util.UUID.randomUUID().toString(),
+            createdAt = System.currentTimeMillis(),
+            input = alert.text,
+            analysis = Analysis(
+                verdict = Verdict.SCAM,
+                riskScore = alert.score,
+                category = category,
+                summary = summary,
+                redFlags = redFlags,
+                nextSteps = nextSteps,
+                safeReply = "I will not share any sensitive information or click any links.",
+            ),
+            source = Source.ON_DEVICE,
+            latencyMs = 12L,
+            redactions = 0,
+        )
+
+        // 1. Record to on-device LocalHistory
+        runCatching { LocalHistory.record(ctx, run) }
+
+        // 2. Sync to Firebase user checks
+        runCatching { Repository.saveCheck(run) }
+
+        // 3. Auto-share to Family Circle group if circle sharing is enabled
+        val autoShare = ctx.getSharedPreferences("chaukas.settings", Context.MODE_PRIVATE)
+            .getBoolean("autoShareCircle", true)
+        if (autoShare) {
+            CoroutineScope(Dispatchers.IO).launch {
+                runCatching {
+                    Repository.autoShareToCircles(run, ctx)
+                }
+            }
+        }
     }
 }

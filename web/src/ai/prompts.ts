@@ -71,14 +71,18 @@ export interface DojoBrief {
   isScam: boolean;
   theme: string;
   channel: string;
+  language?: string;
 }
 
 export function buildDojoPrompt(brief: DojoBrief): string {
   const what = brief.isScam
     ? `a realistic SCAM ${brief.channel} about ${brief.theme}. Make it believable, using subtle tricks rather than obvious ones. Use fake but plausible details. Any link must use a fake look-alike domain.`
     : `a realistic, completely LEGITIMATE ${brief.channel} about ${brief.theme}. It may sound a little urgent, but it must not ask for codes, passwords, payment by gift card or crypto, and any link must be the organisation's real well-known domain.`;
+  const langRule = brief.language && brief.language !== 'English' && brief.language !== 'en'
+    ? `\nWrite the message, tells, and explanation in ${brief.language}.`
+    : '';
   return `Write ${what}
 Keep the message under 60 words. "sender" is how the sender would appear on a phone.
-"tells" lists up to 3 details a careful reader would use to decide. "explanation" is 1-2 sentences teaching the lesson.
+"tells" lists up to 3 details a careful reader would use to decide. "explanation" is 1-2 sentences teaching the lesson.${langRule}
 Reply only with JSON.`;
 }

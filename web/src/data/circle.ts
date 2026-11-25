@@ -112,6 +112,17 @@ export async function leaveCircle(circle: Circle) {
   }
 }
 
+/** Delete a group completely (for owners/creators). */
+export async function deleteCircle(circle: Circle) {
+  const { fb, user } = need();
+  const ref = doc(fb.db, 'circles', circle.id);
+  if (circle.ownerUid === user.uid || circle.members.every((m) => m === user.uid)) {
+    await deleteDoc(ref);
+  } else {
+    await leaveCircle(circle);
+  }
+}
+
 /** A person can be in this many family groups at once. */
 export const MAX_GROUPS = 2;
 

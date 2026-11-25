@@ -47,6 +47,7 @@ export function CheckView() {
   const [qr, setQr] = useState<QrFinding[]>([]);
   const [voice, setVoice] = useState<VoiceState>('idle');
   const listening = voice !== 'idle';
+  const [isKnownContact, setIsKnownContact] = useState(false);
   const [secs, setSecs] = useState(0);
   useEffect(() => {
     if (voice !== 'listening') return setSecs(0);
@@ -55,6 +56,7 @@ export function CheckView() {
   }, [voice]);
   const dictation = useRef<VoiceSession | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const composerRef = useRef<HTMLElement>(null);
   const fromShare = useRef(cameFromShare());
@@ -132,7 +134,12 @@ export function CheckView() {
       }
       setRun(r);
       saveRun(r);
-      autoShareToCircles(r).then((names) => names.length && toast(`Shared with ${names.join(', ')}`), () => undefined);
+      if (!isKnownContact) {
+        autoShareToCircles(r).then((names) => names.length && toast(`Shared with ${names.join(', ')}`), () => undefined);
+      } else if (r.analysis.verdict !== 'safe' && r.analysis.riskScore >= 65) {
+        const flags = r.analysis.redFlags.map((f) => f.label).join(' · ');
+        toast(`${t('Red flags detected from contact:')} ${flags}. ${t('Kept private to protect your contact.')}`, 'alert');
+      }
     } catch (e) {
       setError(e instanceof ChaukasError ? e : new ChaukasError(String(e)));
     } finally {
@@ -143,11 +150,20 @@ export function CheckView() {
   const addImage = async (file: File | Blob | null | undefined) => {
     if (!file || !file.type.startsWith('image/')) return;
     try {
-      setImage(await fileToImageInput(file));
+      const img = await fileToImageInput(file);
+      setImage(img);
       // QR codes are decoded on-device with the browser's BarcodeDetector.
       const codes = await decodeQr(file);
       setQr(codes.map(inspectQr));
       if (codes.length) toast('Found a QR code in the screenshot', 'info');
+
+      // Fast on-device OCR scan to immediately read text and populate the composer
+      toast(t('Reading the words in your screenshot on this phone…'), 'info');
+      const read = await readTextOnDevice(img.previewUrl);
+      if (read && read.trim()) {
+        setText((prev) => (prev.trim() ? `${prev.trim()}\n${read.trim()}` : read.trim()));
+        toast(t('Read on this phone. Checking message…'), 'info');
+      }
     } catch {
       toast('That image could not be read', 'x');
     }
@@ -159,6 +175,7 @@ export function CheckView() {
     void takeSharedImage()
       .then((blob) => (blob ? addImage(blob) : undefined))
       .finally(() => setShareReady(true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -230,7 +247,7 @@ export function CheckView() {
 
   return (
     <div className="page check-page">
-      {!arrivedByShare && <Welcome onTry={() => setText(SAMPLES[0].text)} />}
+      {!arrivedByShare && <Welcome onTry={() => setText(t(SAMPLES[0].text))} />}
       <header className="hero">
         <span className="eyebrow hero-eyebrow">
           <span className="dot safe pulse" /> {engineName}
@@ -329,7 +346,7 @@ export function CheckView() {
                   try {
                     const blob = await (await fetch(`${import.meta.env.BASE_URL}samples/upi-qr-scam.png`)).blob();
                     await addImage(new File([blob], 'upi-qr-scam.png', { type: 'image/png' }));
-                    setText('Congratulations! Your Flipkart cashback refund of Rs 4,999 is approved. Scan this QR to receive the money in your account now.');
+                    setText(t('Congratulations! Your Flipkart cashback refund of Rs 4,999 is approved. Scan this QR to receive the money in your account now.'));
                   } catch {
                     toast('Could not load the example', 'x');
                   }
@@ -338,7 +355,7 @@ export function CheckView() {
                 <Icon name="qr" style={{ width: 14, height: 14 }} /> {t('QR "refund" (India)')}
               </button>
               {SAMPLES.map((s) => (
-                <button key={s.label} className={`chip sample s-${s.tone}`} onClick={() => setText(s.text)}>
+                <button key={s.label} className={`chip sample s-${s.tone}`} onClick={() => setText(t(s.text))}>
                   <span className={`dot ${s.tone}`} /> {t(s.label)}
                 </button>
               ))}
@@ -363,15 +380,27 @@ export function CheckView() {
               disabled={voice === 'writing'}
               title="Say the message out loud, or what a caller told you"
             >
-              <Icon name={voice === 'listening' ? 'x' : 'mic'} /> {t(voice === 'writing' ? 'Writing…' : listening ? 'Stop' : 'Speak')}
+              <Icon name={voice === 'listening' ? 'x' : 'mic'} /> <span className="tool-text">{t(voice === 'writing' ? 'Writing…' : listening ? 'Stop' : 'Speak')}</span>
             </button>
             <button className="btn tool paste sm" onClick={pasteFromClipboard}>
-              <Icon name="clipboard" /> {t('Paste')}
+              <Icon name="clipboard" /> <span className="tool-text">{t('Paste')}</span>
             </button>
-            <button className="btn tool shot sm" onClick={() => fileRef.current?.click()}>
-              <Icon name="image" /> {t('Screenshot')}
+            <button
+              className="btn tool shot sm"
+              onClick={() => cameraRef.current?.click()}
+              title="Take a photo with your camera"
+            >
+              <Icon name="camera" /> <span className="tool-text">{t('Camera')}</span>
             </button>
-            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => addImage(e.target.files?.[0])} />
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => addImage(e.target.files?.[0])} />
+            <button
+              className="btn tool shot sm"
+              onClick={() => fileRef.current?.click()}
+              title="Choose a photo or screenshot"
+            >
+              <Icon name="image" /> <span className="tool-text">{t('Photo')}</span>
+            </button>
+            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/*" hidden onChange={(e) => addImage(e.target.files?.[0])} />
             {(text || image) && (
               <button className="btn ghost sm" onClick={reset}>
                 {t('Clear')}
@@ -391,6 +420,18 @@ export function CheckView() {
             options={(['private', 'smart', 'cloud'] as PrivacyMode[]).map((m) => ({ value: m, label: t(MODE_COPY[m].title), icon: MODE_COPY[m].icon }))}
           />
           <p className="mode-line">{t(MODE_COPY[settings.mode].line)}</p>
+          <div className="row wrap" style={{ gap: 8, marginTop: 6 }}>
+            <button
+              type="button"
+              className={`chip xs ${isKnownContact ? 'on' : ''}`}
+              style={{ cursor: 'pointer', background: isKnownContact ? 'var(--mint-100, #d0f4de)' : 'var(--surface-sunken)', border: '1px solid var(--border)' }}
+              onClick={() => setIsKnownContact((k) => !k)}
+              title={isKnownContact ? t('Sender is a saved contact: warnings stay private to you') : t('Sender is unknown: scams (65+) auto-share to Family Circle')}
+            >
+              <Icon name={isKnownContact ? 'user' : 'alert'} style={{ width: 13, height: 13 }} />
+              <span>{isKnownContact ? t('From saved contact (private)') : t('From unknown sender')}</span>
+            </button>
+          </div>
         </div>
         <button className="btn primary lg check-btn" onClick={() => void run_()} disabled={busy || (!text.trim() && !image)}>
           {busy ? (
@@ -536,7 +577,7 @@ function GoingAround({ onPick }: { onPick: (text: string) => void }) {
           const sample = SAMPLES.find((x) => x.label === p.label);
           return (
             <li key={p.label}>
-              <button onClick={() => sample && onPick(sample.text)}>
+              <button onClick={() => sample && onPick(t(sample.text))}>
                 <span className="ga-dot" aria-hidden="true" />
                 <span className="grow">
                   <b>{t(p.title)}</b>

@@ -75,10 +75,13 @@ Adding a country is one entry in [`report.ts`](web/src/lib/report.ts). Adding a 
 **Easy for everyone, on one screen**
 - A large **Speak** button under the message box: read the message out, and it stops by itself when you pause. Answers can be **read out loud**.
 - **One tap switches the language** to English, हिन्दी, বাংলা, தமிழ், తెలుగు or मराठी: the menus, buttons and result headings change, and the answer comes in that language too (14 answer languages in Settings, behind the gear icon), plus an optional **casual tone**.
+- **Dynamic Multilingual Samples**: One-tap sample chips (QR "refund", KYC update, UPI refund, Electricity bill) populate the text box directly in your chosen language (English, हिन्दी, বাংলা, தமிழ், తెలుగు, मराठी) so non-English speakers can test detection in their mother tongue immediately.
+- **Smart Contact Awareness**: Choose whether a checked message came from an **unknown sender** or a **saved contact**. Risky messages from unknown senders automatically protect the family circle; messages from saved contacts show detailed red flags privately to protect against account takeovers without leaking sensitive chats.
 - Risky results show the verdict in your language, three things *not* to do, **Call my family** and **Call 1930** buttons, and **Send to WhatsApp**, which opens WhatsApp with the warning already written (personal details removed, links unclickable).
 
 **Check anything**
 - **Share** a message or screenshot from any app, or paste it. On Android, **automatic warnings** for new SMS and WhatsApp messages (see [No copy-paste needed](#no-copy-paste-needed)).
+- **Camera & Photo scan**: take a photo or attach an image of any paper notice, letter, or screen. High-resolution camera capture with on-device multi-script OCR (Latin + Devanagari) extracts text, links, and phone numbers before hybrid checking.
 - **Speak**: a large button under the message box. Read a message aloud, or say what a caller told you, in English or an Indian language. Your words appear live as you talk, in the language you picked, in Chrome (desktop and Android) and Safari (Mac and iPhone). Where a browser has no live recognition (Brave, Firefox, some in-app browsers), a short recording is written down by Gemini through Firebase AI Logic instead; only the audio is sent for that, and the check itself still follows your privacy mode. The Android app has its own **Speak** button with live words and a language picker, using the phone's speech recogniser.
 - **Screenshots stay private**: when a screenshot would need the cloud (no Gemini Nano), Chaukas first **reads its words on the device** (Tesseract, served by the app, loaded only when needed) and sends only that text, with personal details removed. The picture itself is sent only if the person taps *Send the picture anyway*.
 - **QR and UPI inspector**: decodes QR codes in screenshots *on the device* and says what scanning would really do: *"Scanning this will SEND ₹4,999 to…"*.
@@ -99,8 +102,12 @@ Adding a country is one entry in [`report.ts`](web/src/lib/report.ts). Adding a 
 <td valign="top">
 
 **Act on it**
-- **Report it** with the right contacts for your country. For India: 1930 helpline, cybercrime.gov.in, Chakshu and SMS 1909.
-- **"I already paid or shared a code"**: a first-hour recovery plan, starting with the call that can still freeze the money.
+- **Report it** with the right contacts for your country. For India, includes 4 official quick actions on both Web and Android:
+  - 📞 **1930 Helpline dialer**: One tap calls the National Cybercrime Reporting Portal helpline.
+  - 🌐 **cybercrime.gov.in**: Direct official portal filing.
+  - 🛡️ **Chakshu (DoT)**: Sanchar Saathi suspect fraud reporting.
+  - 💬 **SMS 1909**: Telecom spam & unsolicited commercial communication reporting.
+- **"I already paid or shared a code"**: an expanded first-hour recovery plan with step-by-step guidance, starting with the call that can still freeze the money (bank helpline + 1930), followed by card blocks and cybercrime reporting.
 - **Scam alert picture**: a WhatsApp-ready card with personal details removed, made in the browser.
 
 </td>
@@ -108,8 +115,9 @@ Adding a country is one entry in [`report.ts`](web/src/lib/report.ts). Adding a 
 
 **Stay safe together**
 - **Family Circle**: join with just a name (no email, password or phone number). The name is confirmed once and then stays fixed. Everyone gets a **personal Chaukas ID and QR code** made from the name they gave plus four digits (like `riya-4821`; names in Hindi, Bengali, Tamil or Telugu script are spelled in Latin letters, so नानी becomes `nani-0712`). Scanning someone's QR or typing their ID opens a **Keep or not** popup; Keep makes your family group with them on the spot, and they get the same popup on their phone. Each person can be in **up to two groups**, sees every member with their Chaukas ID, and can **Keep or Don't keep** an invite later from a *Waiting for you* list. Messages scoring **65 or more** are **shared with the group automatically** (safe messages never are), and group warnings **disappear after 3 days**. Family can react (*I got this too*, *I'll call you*) or forward a warning. A **one-tap WhatsApp or SMS link** brings in people who don't have Chaukas yet. When someone shares a warning, the rest of the group gets a **notification** (while Chaukas is open or in a background tab).
+- **Group Code side-by-side & quick join**: Groups prominently display a 6-character Group Code (`Code: ABC123`) right beside the group name with 1-tap copy. Family members who don't have a QR scanner can easily join using this code, even if already participating in another circle (up to 2 groups).
 - **Forward a warning on WhatsApp or SMS**: personal details removed and scam links made unclickable (`bad[.]top`), so nobody taps them by accident.
-- **Scam Dojo**: a practice game where Gemini writes a real-looking scam or a genuine message and you guess.
+- **Scam Dojo**: an interactive training game on both Web and Android, fully localized across 6 Indian languages (English, Hindi, Bengali, Tamil, Telugu, Marathi), where Gemini creates real-looking scams and genuine messages to train your detection instincts.
 - **History and insights**: what is targeting you, the tricks you see most and how often checks stayed on your device.
 
 </td>
@@ -148,7 +156,7 @@ The people most at risk are the least likely to copy a message into another app.
 
 | | How it works | Where the first check runs |
 |---|---|---|
-| **Android: automatic warnings** | Opt in once. When a new SMS, WhatsApp or Telegram message looks like a scam, a notification warns you *before you open it*. Tap it for the full check. Separate switches for **SMS** and **WhatsApp**. The app counts every message it checks (today, split by SMS and WhatsApp, and all time; deleting a message never lowers the count) and lists only the warnings (score 65 or more), for 3 days. A **Test it now** button proves the checker is really receiving messages and, if a phone like Xiaomi is blocking it, shows the fix. An optional silent note confirms safe ones. | Fully on the phone, from the local scam signals. Message text is never stored or sent. |
+| **Android: automatic warnings** | Opt in once. When a new SMS or WhatsApp message arrives from an **unsaved or unknown number**, Chaukas checks it in memory. If it looks like a scam (score 65+), a high-priority heads-up notification warns you *before you open it*, automatically records the check into **Local History**, and posts the warning to your **Family Circle** group so loved ones are protected. If a scam text arrives from a **saved contact**, Chaukas posts a private warning explaining why red flags were detected (e.g. account takeover or SIM swap) without ever auto-sharing to the group. Separate switches for **SMS** and **WhatsApp**, live activity status indicators, and clean controls. | Fully on the phone, from the local scam signals. Message text is never stored or sent without redaction. |
 | **Android: share or select** | Long-press a message → **Share → Chaukas**, or select text → **Check with Chaukas**. Shared screenshots are read on the phone (Latin and Devanagari scripts). | ML Kit text recognition on the phone, then the hybrid check |
 | **iOS: share sheet** | Select a message → **Share → Chaukas**. A card shows an instant verdict, and **Full check in Chaukas** opens the hybrid check. A Shortcuts link (`chaukas://check?text=`) works too. | Instant verdict in the share extension, on the iPhone |
 | **Web: installed app** | Install Chaukas from Chrome, then share text or a screenshot to it from any app. The check starts by itself. | The browser, with Gemini Nano when available |
@@ -331,7 +339,7 @@ Placeholders are restored on the device, and a privacy receipt shows the exact t
 
 | Suite | Covers | Command |
 |---|---|---|
-| Web unit tests (78) | Redaction of Indian and international identifiers (and leaving ordinary numbers alone), link inspector, scam signals, QR/UPI inspector, language prompts, output repair, report and recovery steps for every country, spoken verdict lines in all six languages, casual tone prompts, WhatsApp/SMS links and link defanging, personal Chaukas IDs, WAV encoding for voice input, every built-in example | `cd web && npm test` |
+| Web unit tests (83) | Redaction of Indian and international identifiers (and leaving ordinary numbers alone), link inspector, scam signals, QR/UPI inspector, language prompts, output repair, report and recovery steps for every country, spoken verdict lines in all six languages, casual tone prompts, WhatsApp/SMS links and link defanging, personal Chaukas IDs, WAV encoding for voice input, every built-in example | `cd web && npm test` |
 | Lint and types | ESLint with TypeScript and React Hooks rules, `tsc --noEmit` | `npm run lint && npm run typecheck` |
 | Firestore rules (23) | Every rule above, against the Firestore emulator | `cd tests/rules && npm install && npm test` |
 | Android unit tests | Kotlin redactor, signals, parser, and which notifications the automatic warnings act on | `cd android && ./gradlew testDebugUnitTest` |

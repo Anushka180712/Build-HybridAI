@@ -5,7 +5,7 @@
  * in up to two groups, can Keep or Leave an invite any time later, and only scam warnings are shared.
  */
 import { useEffect, useRef, useState } from 'react';
-import { MAX_GROUPS, joinCircle, leaveCircle, listenAlerts, listenMyCircles, reactToAlert, setMyHandleIn, type Circle, type CircleAlert } from '../data/circle';
+import { MAX_GROUPS, deleteCircle, joinCircle, leaveCircle, listenAlerts, listenMyCircles, reactToAlert, setMyHandleIn, type Circle, type CircleAlert } from '../data/circle';
 import { displayName, signInWithGoogle, signInWithName, signOutUser, useUser } from '../data/auth';
 import { isFirebaseConfigured } from '../firebase/config';
 import { getFirebase } from '../firebase/app';
@@ -93,7 +93,20 @@ export function CircleView({ param }: { param?: string }) {
     );
   }
   if (!ready) return <div className="page"><CircleHeader /><div className="skeleton" style={{ height: 180 }} /></div>;
+  const savedName = typeof window !== 'undefined' ? localStorage.getItem('chaukas_user_name') : null;
   if (!user) {
+    if (savedName) {
+      return <div className="page"><CircleHeader /><div className="skeleton" style={{ height: 180 }} /></div>;
+    }
+    return (
+      <div className="page">
+        <CircleHeader />
+        <SignIn inviteCode={inviteCode} addingSomeone={!!personHandle} />
+        <CirclePitch />
+      </div>
+    );
+  }
+  if (!user.displayName && !savedName && user.isAnonymous) {
     return (
       <div className="page">
         <CircleHeader />
@@ -178,8 +191,8 @@ export function CircleView({ param }: { param?: string }) {
             <AutoShareToggle />
           </div>
         </details>
-        {!circle && (
-          <details className="card fold">
+        {circles.length < MAX_GROUPS && (
+          <details className="card fold" open={!circle}>
             <summary><Icon name="users" /> {t('Got a group code?')}</summary>
             <JoinWithCode onDone={setActive} />
           </details>
@@ -224,17 +237,17 @@ function SignIn({ inviteCode, addingSomeone }: { inviteCode?: string; addingSome
         <Avatar name="Dad" size={52} />
         <Avatar name="Leo" size={44} />
       </div>
-      {inviteCode && <span className="badge lilac">You're invited to circle {inviteCode}</span>}
-      {addingSomeone && <span className="badge lilac">Add your name first, then pick a group for them</span>}
-      <h2 className="display" style={{ fontSize: 'var(--fs-xl)' }}>What should your family call you?</h2>
-      <p className="muted small">Just a name. No email, no password, no phone number.</p>
+      {inviteCode && <span className="badge lilac">{t("You're invited to circle")} {inviteCode}</span>}
+      {addingSomeone && <span className="badge lilac">{t('Add your name first, then pick a group for them')}</span>}
+      <h2 className="display" style={{ fontSize: 'var(--fs-xl)' }}>{t('What should your family call you?')}</h2>
+      <p className="muted small">{t('Just a name. No email, no password, no phone number.')}</p>
       <p className="callout info name-lock">
         <Icon name="lock" />
         <span>{t('Choose carefully. Once you confirm your name, it cannot be changed later. Your Chaukas ID is made from it.')}</span>
       </p>
       {confirming ? (
         <div className="name-confirm" role="group" aria-label="Confirm your name">
-          <p className="small">Your family will see you as <b>{name.trim()}</b>. Is that right?</p>
+          <p className="small">{t('Your family will see you as')} <b>{name.trim()}</b>. {t('Is that right?')}</p>
           <div className="row" style={{ gap: 8, marginTop: 10 }}>
             <button className="btn ghost" disabled={busy} onClick={() => setConfirming(false)}>{t('Edit')}</button>
             <button className="btn primary" disabled={busy} onClick={confirm}>{busy ? '…' : t('Confirm')}</button>
@@ -249,12 +262,12 @@ function SignIn({ inviteCode, addingSomeone }: { inviteCode?: string; addingSome
             if (name.trim()) setConfirming(true);
           }}
         >
-          <input className="input grow" placeholder="e.g. Nani, Papa, Riya" value={name} onChange={(e) => setName(e.target.value)} aria-label="Your name" required maxLength={40} />
-          <button className="btn primary" disabled={!name.trim()}>{inviteCode ? 'Join' : 'Continue'}</button>
+          <input className="input grow" placeholder={t('e.g. Nani, Papa, Riya')} value={name} onChange={(e) => setName(e.target.value)} aria-label="Your name" required maxLength={40} />
+          <button className="btn primary" disabled={!name.trim()}>{inviteCode ? t('Join') : t('Continue')}</button>
         </form>
       )}
       <button type="button" className="btn ghost sm signin-alt" onClick={() => signInWithGoogle().catch((err) => toast(err.message, 'x'))}>
-        <Icon name="google" /> Or use a Google account to keep circles on all your devices
+        <Icon name="google" /> {t('Or use a Google account to keep circles on all your devices')}
       </button>
     </section>
   );
@@ -262,11 +275,15 @@ function SignIn({ inviteCode, addingSomeone }: { inviteCode?: string; addingSome
 
 /** For family who were sent a group code or link instead of a QR. */
 function JoinWithCode({ onDone }: { onDone: (id: string) => void }) {
+  const t = useT();
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
   return (
     <div className="card card-pad create-join">
-      <span className="eyebrow">Got a group code?</span>
+      <span className="eyebrow">{t('Got a group code?')}</span>
+      <p className="xs subtle" style={{ marginTop: 4 }}>
+        {t('Enter the 6-character code from the creator or family member to join.')}
+      </p>
       <form
         className="row"
         style={{ gap: 8, marginTop: 8 }}
@@ -276,16 +293,16 @@ function JoinWithCode({ onDone }: { onDone: (id: string) => void }) {
           try {
             onDone(await joinCircle(value));
             setValue('');
-            toast('You joined the group');
+            toast(t('You joined the group'));
           } catch (err) {
-            toast(err instanceof Error ? err.message : 'Something went wrong', 'x');
+            toast(err instanceof Error ? err.message : t('Something went wrong'), 'x');
           } finally {
             setBusy(false);
           }
         }}
       >
-        <input className="input grow mono code-input" placeholder="ABC123" value={value} maxLength={6} onChange={(e) => setValue(e.target.value.toUpperCase())} aria-label="Group code" />
-        <button className="btn primary sm" disabled={busy || value.length !== 6}>Join</button>
+        <input className="input grow mono code-input" placeholder="ABC123" value={value} maxLength={6} onChange={(e) => setValue(e.target.value.toUpperCase())} aria-label={t('Group code')} />
+        <button className="btn primary sm" disabled={busy || value.length !== 6}>{busy ? '…' : t('Join')}</button>
       </form>
     </div>
   );
@@ -306,11 +323,21 @@ function GroupCard({ circle, uid, myName }: { circle: Circle; uid: string; myNam
   const waiting = (circle.invited ?? []).map((u) => circle.invitedNames?.[u] ?? 'Someone');
   return (
     <section className="card card-pad group-card">
-      <div className="circle-tab on">
+      <div className="circle-tab on" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <span className="grow">
           <b className="group-name">{circle.name}</b>
-          <span className="xs subtle">{circle.members.length} member{circle.members.length === 1 ? '' : 's'}</span>
+          <span className="xs subtle" style={{ marginLeft: 8 }}>{circle.members.length} {circle.members.length === 1 ? t('member') : t('members')}</span>
         </span>
+        <button
+          type="button"
+          className="chip mono"
+          style={{ cursor: 'pointer', gap: 6, display: 'inline-flex', alignItems: 'center' }}
+          onClick={() => copyText(circle.id, t('Group code copied'))}
+          title={t('Copy group code')}
+        >
+          <Icon name="copy" />
+          <span>{t('Code')}: <b>{circle.id}</b></span>
+        </button>
       </div>
       <ul className="group-people">
         {circle.members.map((m) => (
@@ -321,7 +348,7 @@ function GroupCard({ circle, uid, myName }: { circle: Circle; uid: string; myNam
           </li>
         ))}
       </ul>
-      {waiting.length > 0 && <p className="xs subtle">Waiting for: {waiting.join(', ')}.</p>}
+      {waiting.length > 0 && <p className="xs subtle">{t('Waiting for: ')}{waiting.join(', ')}.</p>}
       <div className="group-actions">
         <button className={`btn sm ${open === 'add' ? 'primary' : 'soft'}`} onClick={() => setOpen(open === 'add' ? '' : 'add')}>
           <Icon name="plus" /> {t('Add person')}
@@ -341,11 +368,26 @@ function GroupCard({ circle, uid, myName }: { circle: Circle; uid: string; myNam
         >
           <Icon name="logout" /> {t('Leave group')}
         </button>
+        {(circle.ownerUid === uid || circle.members.length === 1) && (
+          <button
+            className="btn sm ghost group-delete"
+            style={{ color: 'var(--rose-700, #b91c1c)' }}
+            onClick={() => {
+              if (!window.confirm(`Delete ${circle.name}? This will delete the group for all members.`)) return;
+              deleteCircle(circle).then(
+                () => toast('Group deleted'),
+                () => toast('Could not delete the group', 'x'),
+              );
+            }}
+          >
+            <Icon name="trash" /> {t('Delete group')}
+          </button>
+        )}
       </div>
       {open === 'add' && <AddById circle={circle} bare />}
       {open === 'link' && (
         <div className="group-link">
-          <p className="xs subtle">For family who don't have Chaukas yet. One tap on the link opens it and joins {circle.name}. Group code <b className="mono">{circle.id}</b>.</p>
+          <p className="xs subtle">{t("For family who don't have Chaukas yet. One tap on the link opens it and joins")} {circle.name}. {t('Group code')}: <b className="mono">{circle.id}</b>.</p>
           <div className="row wrap" style={{ gap: 8 }}>
             <a className="btn whatsapp sm" href={whatsappLink(inviteText(circle.id, circle.name))} target="_blank" rel="noreferrer">
               <Icon name="message" /> WhatsApp
@@ -353,14 +395,31 @@ function GroupCard({ circle, uid, myName }: { circle: Circle; uid: string; myNam
             <a className="btn soft sm" href={smsLink(inviteText(circle.id, circle.name))}>
               <Icon name="phone" /> SMS
             </a>
-            <button className="btn ghost sm" onClick={() => copyText(inviteUrl(circle.id), 'Invite link copied')}>
-              <Icon name="copy" /> Copy link
+            <button className="btn ghost sm" onClick={() => copyText(inviteUrl(circle.id), t('Link copied'))}>
+              <Icon name="copy" /> {t('Copy link')}
             </button>
           </div>
         </div>
       )}
     </section>
   );
+}
+
+function circleEmptyExpl(circleName: string, lang: string): string {
+  switch (lang) {
+    case 'hi':
+      return `जब ${circleName} में कोई संदिग्ध मैसेज जाँचेगा, तो वह अपने-आप यहाँ दिखेगा। सिर्फ़ जोखिम भरे मैसेज (65 या ज़्यादा) ही शेयर होते हैं, और हर चेतावनी 3 दिन बाद हट जाती है।`;
+    case 'bn':
+      return `যখন ${circleName}-এর কেউ কোনো প্রতারণামূলক মেসেজ যাচাই করবেন, তা নিজ থেকেই এখানে দেখা যাবে। শুধু ঝুঁকিপূর্ণ মেসেজ (৬৫ বা বেশি) শেয়ার হয়, এবং প্রতিটি সতর্কতা ৩ দিন পর মুছে যায়।`;
+    case 'ta':
+      return `${circleName}-இல் யாராவது மோசடி போன்ற மெசேஜைச் சரிபார்க்கும்போது, அது தானாகவே இங்கே தோன்றும். ஆபத்தான மெசேஜ்கள் (65 அல்லது அதற்கு மேல்) மட்டுமே பகிரப்படும், ஒவ்வொரு எச்சரிக்கையும் 3 நாட்களுக்குப் பிறகு மறைந்துவிடும்.`;
+    case 'te':
+      return `${circleName}లో ఎవరైనా మోసపూరిత సందేశాన్ని తనిఖీ చేసినప్పుడు, అది స్వయంచాలకంగా ఇక్కడ కనిపిస్తుంది. ప్రమాదకరమైన సందేశాలు (65 లేదా అంతకంటే ఎక్కువ) మాత్రమే షేర్ అవుతాయి, ప్రతి హెచ్చరిక 3 రోజుల తర్వాత తొలగిపోతుంది.`;
+    case 'mr':
+      return `जेव्हा ${circleName} मधील कोणी फसव्या वाटणाऱ्या मेसेजची तपासणी करेल, तेव्हा तो आपोआप इथे दिसेल. फक्त जोखमीचे मेसेज (६५ किंवा त्याहून अधिक) शेअर केले जातात, आणि प्रत्येक सूचना ३ दिवसांनंतर नाहीशी होते.`;
+    default:
+      return `When someone in ${circleName} checks a message that looks like a scam, it shows up here by itself. Only risky messages (65 or more) are shared, and each warning disappears after 3 days.`;
+  }
 }
 
 function CircleFeed({ circle, uid }: { circle: Circle; uid: string }) {
@@ -378,7 +437,7 @@ function CircleFeed({ circle, uid }: { circle: Circle; uid: string }) {
       ) : alerts.length === 0 ? (
         <div className="card empty">
           <h3>{t('All quiet')}</h3>
-          <p className="small">When someone in {circle.name} checks a message that looks like a scam, it shows up here by itself. Only risky messages (65 or more) are shared, and each warning disappears after 3 days.</p>
+          <p className="small">{circleEmptyExpl(circle.name, t.lang)}</p>
         </div>
       ) : (
         <ul className="feed">
@@ -425,16 +484,17 @@ function CircleFeed({ circle, uid }: { circle: Circle; uid: string }) {
 }
 
 function CirclePitch() {
+  const t = useT();
   return (
     <section className="pitch">
       {[
-        ['1', 'Scan or type an ID', 'Scan a family member’s Chaukas QR, or type their ID, like riya-4821.'],
-        ['2', 'Tap Keep', 'Your family group is made with them. They tap Keep on their phone too.'],
-        ['3', 'Warn each other', 'Scam warnings reach everyone by themselves, with personal details removed. Safe messages stay private.'],
-      ].map(([n, t, b]) => (
+        ['1', t('Scan or type an ID'), t("Scan a family member's Chaukas QR, or type their ID, like riya-4821.")],
+        ['2', t('Tap Keep'), t('Your family group is made with them. They tap Keep on their phone too.')],
+        ['3', t('Warn each other'), t('Scam warnings reach everyone by themselves, with personal details removed. Safe messages stay private.')],
+      ].map(([n, title, b]) => (
         <div key={n} className="pitch-step">
           <span className="pitch-n display">{n}</span>
-          <b>{t}</b>
+          <b>{title}</b>
           <p className="small muted">{b}</p>
         </div>
       ))}
@@ -464,7 +524,7 @@ function MyId({ name }: { name: string }) {
         /* cancelled: fall back to copy */
       }
     }
-    copyText(text, 'Your ID is copied');
+    copyText(text, t('ID copied'));
   };
   return (
     <div className="card card-pad my-id">
@@ -473,10 +533,10 @@ function MyId({ name }: { name: string }) {
         <>
           <QrCode text={url} label={`QR code for Chaukas ID ${handle}`} />
           <div className="my-id-handle mono">{handle}</div>
-          <p className="xs subtle">Family scan this with their phone camera, or type your ID. You get a popup to keep their group or not.</p>
+          <p className="xs subtle">{t('Family scan this with their phone camera, or type your ID. You get a popup to keep their group or not.')}</p>
           <div className="row wrap" style={{ gap: 6, justifyContent: 'center' }}>
             <button className="btn soft sm" onClick={share}><Icon name="share" /> {t('Share')}</button>
-            <button className="btn ghost sm" onClick={() => copyText(handle, 'ID copied')}><Icon name="copy" /> {t('Copy ID')}</button>
+            <button className="btn ghost sm" onClick={() => copyText(handle, t('ID copied'))}><Icon name="copy" /> {t('Copy ID')}</button>
           </div>
         </>
       ) : (
@@ -504,7 +564,7 @@ function AddById({ circle, bare }: { circle?: Circle; bare?: boolean }) {
     <div className={bare ? 'add-id bare' : `card card-pad add-id${circle ? '' : ' tint-lilac'}`}>
       <span className="eyebrow">{circle ? `Add someone to ${circle.name}` : t('Make your family group')}</span>
       <form className="row add-id-form" style={{ gap: 8, marginTop: 8 }} onSubmit={(e) => { e.preventDefault(); setAsking(normalizeHandle(value)); }}>
-        <input className="input grow mono" placeholder="Their ID, e.g. riya-4821" value={value} onChange={(e) => setValue(e.target.value)} aria-label="Their Chaukas ID" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+        <input className="input grow mono" placeholder={t('Their ID, e.g. riya-4821')} value={value} onChange={(e) => setValue(e.target.value)} aria-label="Their Chaukas ID" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
         <button className="btn primary sm" disabled={!normalizeHandle(value)}>{t('Add')}</button>
         <button type="button" className="btn soft sm" onClick={() => scanRef.current?.click()} title="Take a photo of their Chaukas QR">
           <Icon name="qr" /> {t('Scan QR')}
@@ -512,8 +572,8 @@ function AddById({ circle, bare }: { circle?: Circle; bare?: boolean }) {
         <input ref={scanRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { void scan(e.target.files?.[0]); e.target.value = ''; }} />
       </form>
       <p className="xs subtle" style={{ marginTop: 8 }}>
-        {circle ? 'You get a popup to keep them or not.' : 'Scan a family member’s QR or type their ID, then tap Keep. Your group is made with them.'}
-        {!bare && waiting.length > 0 && <> Waiting for: {waiting.join(', ')}.</>}
+        {circle ? t('You get a popup to keep them or not.') : t("Scan a family member's QR or type their ID, then tap Keep. Your group is made with them.")}
+        {!bare && waiting.length > 0 && <> {t('Waiting for: ')}{waiting.join(', ')}.</>}
       </p>
       {asking && (
         <KeepDialog
@@ -687,13 +747,14 @@ async function forwardAlert(text: string) {
 
 /** Share every scam or suspicious check with my groups, on by default. */
 function AutoShareToggle() {
+  const t = useT();
   const on = settingsStore.use().autoShareCircle;
   return (
     <button className={`card card-pad notify-toggle ${on ? 'on' : ''}`} onClick={() => settingsStore.set({ autoShareCircle: !on })} aria-pressed={on}>
       <Icon name="share" />
       <span className="grow">
-        <b>{on ? 'Auto-share scams: on' : 'Auto-share scams: off'}</b>
-        <span className="xs subtle">{on ? 'Messages you check that score 65 or more go to your group, with personal details removed. They disappear after 3 days. Tap to turn off.' : 'Tap to share every scam you check with your groups automatically.'}</span>
+        <b>{on ? t('Auto-share scams: on') : t('Auto-share scams: off')}</b>
+        <span className="xs subtle">{on ? t('Messages you check that score 65 or more go to your group, with personal details removed. They disappear after 3 days. Tap to turn off.') : t('Tap to share every scam you check with your groups automatically.')}</span>
       </span>
     </button>
   );

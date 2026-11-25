@@ -29,12 +29,14 @@ function ctor(): Ctor | null {
 
 /** Brave ships the API but blocks the speech service behind it, so treat it as unsupported. */
 function isBrave(): boolean {
+  if (typeof navigator === 'undefined') return false;
   return !!(navigator as Navigator & { brave?: unknown }).brave;
 }
 
 function isMobile(): boolean {
-  const ua = navigator.userAgent;
-  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (ua.includes('Macintosh') && navigator.maxTouchPoints > 1);
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (ua.includes('Macintosh') && (navigator.maxTouchPoints ?? 0) > 1);
 }
 
 /** Desktop browsers with live recognition, where a backup recording can run alongside it. */

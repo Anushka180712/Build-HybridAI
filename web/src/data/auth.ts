@@ -18,10 +18,30 @@ export function useUser(): { user: User | null; ready: boolean } {
     // Firebase does not announce a new display name, so signInWithName does.
     const renamed = () => setNameVersion((n) => n + 1);
     window.addEventListener(NAME_EVENT, renamed);
-    const stop = onAuthStateChanged(fb.auth, (u) => {
+    const stop = onAuthStateChanged(fb.auth, async (u) => {
+      try {
+        const saved = localStorage.getItem('chaukas_user_name');
+        if (u && saved && !u.displayName) {
+          await updateProfile(u, { displayName: saved }).catch(() => {});
+        }
+      } catch {
+        /* ignore storage error */
+      }
       setUser(u);
       setReady(true);
     });
+    try {
+      const saved = localStorage.getItem('chaukas_user_name');
+      if (!fb.auth.currentUser && saved) {
+        signInAnonymously(fb.auth).then(async (cred) => {
+          await updateProfile(cred.user, { displayName: saved }).catch(() => {});
+          setUser(cred.user);
+          setReady(true);
+        }).catch(() => {});
+      }
+    } catch {
+      /* ignore storage error */
+    }
     return () => {
       stop();
       window.removeEventListener(NAME_EVENT, renamed);
@@ -36,7 +56,13 @@ export async function signInWithName(name: string): Promise<User> {
   if (!fb) throw new Error('Firebase is not configured.');
   const cred = fb.auth.currentUser ? { user: fb.auth.currentUser } : await signInAnonymously(fb.auth);
   if (name.trim()) {
-    await updateProfile(cred.user, { displayName: name.trim().slice(0, 40) });
+    const clean = name.trim().slice(0, 40);
+    try {
+      localStorage.setItem('chaukas_user_name', clean);
+    } catch {
+      /* ignore storage error */
+    }
+    await updateProfile(cred.user, { displayName: clean });
     window.dispatchEvent(new Event(NAME_EVENT));
   }
   return cred.user;
@@ -63,5 +89,11 @@ export async function signOutUser() {
 }
 
 export function displayName(user: User | null): string {
-  return user?.displayName || (user?.isAnonymous ? 'Guest' : user?.email?.split('@')[0]) || 'Guest';
+  let saved: string | null = null;
+  try {
+    saved = localStorage.getItem('chaukas_user_name');
+  } catch {
+    /* ignore storage error */
+  }
+  return user?.displayName || saved || (user?.isAnonymous ? 'Guest' : user?.email?.split('@')[0]) || 'Guest';
 }

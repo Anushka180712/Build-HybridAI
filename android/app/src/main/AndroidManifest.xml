@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Only while the Speak button is listening -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Optional: To check whether an incoming message sender is saved in contacts -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
 
     <queries>
         <intent>
@@ -50,11 +52,22 @@
             </intent-filter>
         </activity>
 
+        <!-- FileProvider for high-resolution camera photo capture -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- Optional auto-check of new message notifications. Off until the user turns it on
              in the app and grants notification access in system Settings. -->
         <service
             android:name=".guard.GuardService"
-            android:exported="false"
+            android:exported="true"
             android:label="@string/guard_label"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>

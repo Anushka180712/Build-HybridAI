@@ -11,6 +11,7 @@ import { VERDICT_LABEL } from '../lib/format';
 import type { Verdict } from '../ai/types';
 import { Icon } from './Icon';
 import { toast } from './ui';
+import { useT } from '../lib/i18n';
 
 const KEY = 'chaukas.notifyCircle';
 const supported = () => typeof Notification !== 'undefined';
@@ -88,9 +89,10 @@ export function CircleNotifier() {
 
 /** The opt-in switch, shown in Family Circle. */
 export function AlertNotifyToggle() {
+  const t = useT();
   const [on, setOn] = useState(enabled);
   if (!supported()) {
-    return <p className="xs subtle notify-note"><Icon name="info" style={{ width: 13, height: 13, verticalAlign: -2 }} /> On iPhone, add Chaukas to your Home Screen to get group notifications.</p>;
+    return <p className="xs subtle notify-note"><Icon name="info" style={{ width: 13, height: 13, verticalAlign: -2 }} /> {t('On iPhone, add Chaukas to your Home Screen to get group notifications.')}</p>;
   }
   const denied = Notification.permission === 'denied';
   const toggle = async () => {
@@ -100,17 +102,17 @@ export function AlertNotifyToggle() {
       return;
     }
     const p = await Notification.requestPermission();
-    if (p !== 'granted') return toast('Notifications are blocked. Allow them for this site in your browser settings.', 'x');
+    if (p !== 'granted') return toast(t('Notifications are blocked. Allow them for this site in your browser settings.'), 'x');
     try { localStorage.setItem(KEY, '1'); } catch { /* ignore */ }
     setOn(true);
-    toast("You'll be notified when your group shares a warning");
+    toast(t("You'll be notified when your group shares a warning"));
   };
   return (
     <button className={`card card-pad notify-toggle ${on ? 'on' : ''}`} onClick={toggle} aria-pressed={on} disabled={denied && !on}>
       <Icon name="alert" />
       <span className="grow">
-        <b>{on ? 'Group notifications on' : 'Notify me about group warnings'}</b>
-        <span className="xs subtle">{denied ? 'Blocked in browser settings.' : on ? 'Tap to turn off.' : 'Get a notification when someone in your group shares a warning.'}</span>
+        <b>{on ? t('Group notifications on') : t('Notify me about group warnings')}</b>
+        <span className="xs subtle">{denied ? t('Blocked in browser settings.') : on ? t('Tap to turn off.') : t('Get a notification when someone in your group shares a warning.')}</span>
       </span>
     </button>
   );

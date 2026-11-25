@@ -21,9 +21,9 @@ import kotlinx.coroutines.flow.map
 import java.util.UUID
 
 enum class PrivacyMode(val title: String, val line: String) {
-    PRIVATE("Private", "Stays on this phone, always."),
-    SMART("Smart", "On this phone when possible, otherwise personal details are removed before using the cloud."),
-    CLOUD("Most accurate", "Cloud model first, with personal details removed."),
+    PRIVATE("Private", "Stays on this device, always. Works offline once the model is downloaded."),
+    SMART("Smart", "On this device when possible. If not, personal details are removed before it goes to the cloud."),
+    CLOUD("Most accurate", "Uses the larger cloud model first, with personal details removed. Falls back to on-device if offline."),
 }
 
 sealed interface ModelState {
@@ -89,7 +89,7 @@ class HybridEngine(private val cloudModelName: () -> String) {
         }
     }
 
-    suspend fun analyze(text: String, mode: PrivacyMode, redact: Boolean, privateTerms: List<String>): AnalysisRun {
+    suspend fun analyze(text: String, mode: PrivacyMode, redact: Boolean, privateTerms: List<String>, language: String = "English"): AnalysisRun {
         val started = System.currentTimeMillis()
         val deviceReady = modelState() == ModelState.Available
         if (mode == PrivacyMode.PRIVATE && !deviceReady) {
@@ -99,7 +99,7 @@ class HybridEngine(private val cloudModelName: () -> String) {
         val red = if (mayLeave && redact) Redactor.redact(text, privateTerms) else null
         val (signals, _) = Signals.compute(text)
 
-        val response = model(mode.inference()).generateContent(Prompts.analysis(red?.text ?: text, signals))
+        val response = model(mode.inference()).generateContent(Prompts.analysis(red?.text ?: text, signals, language))
         val source = if (response.inferenceSource.toString().contains("DEVICE", ignoreCase = true)) Source.ON_DEVICE else Source.IN_CLOUD
         var analysis = AnalysisParser.parse(response.text ?: "")
         if (red != null) {
@@ -121,8 +121,11 @@ class HybridEngine(private val cloudModelName: () -> String) {
 }
 
 object Prompts {
-    fun analysis(message: String, signals: List<Signal>): String = buildString {
+    fun analysis(message: String, signals: List<Signal>, language: String = "English"): String = buildString {
         appendLine("You are Chaukas, a calm fraud-prevention expert helping ordinary people decide whether a message is a scam.")
+        if (language.isNotBlank() && language != "English") {
+            appendLine("Write summary, every \"why\", nextSteps, safeReply and reassurances in $language, in simple everyday words. Keep \"evidence\" quotes exactly as they appear in the message. Keep JSON keys and enum values (verdict, category, severity) in English.")
+        }
         appendLine("Reply ONLY with one JSON object with these keys:")
         appendLine("""{"verdict":"safe|suspicious|scam","riskScore":0-100,"category":"phishing|impersonation|delivery_fee|bank_or_payment|tech_support|family_emergency|romance|investment_crypto|job_offer|prize_lottery|government_tax|marketplace|legitimate|other","summary":"one plain sentence","redFlags":[{"label":"","evidence":"exact short quote","why":""}],"nextSteps":["short action"],"safeReply":""}""")
         appendLine("riskScore must agree with verdict: safe 0-30, suspicious 31-69, scam 70-100. Max 4 red flags, max 3 next steps.")
