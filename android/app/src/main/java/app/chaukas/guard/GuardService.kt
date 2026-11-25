@@ -66,16 +66,17 @@ class GuardService : NotificationListenerService() {
         if (!Guard.watches(this, kind)) return
         if (!MessageGuard.checkable(sbn.packageName, text, watched)) return
 
-        // Apps re-post the same message on every update: check each one once, debouncing within 5s
+        // Apps re-post the same message on every update: check each one once, debouncing within 2s
         val key = MessageGuard.key(sbn.packageName, text)
         val now = System.currentTimeMillis()
         val lastSeen = seenTimes[key] ?: 0L
-        if (now - lastSeen < 5000L) return
+        if (now - lastSeen < 2000L) return
         seenTimes[key] = now
         if (seenTimes.size > 200) {
             seenTimes.keys.firstOrNull()?.let { seenTimes.remove(it) }
         }
 
+        Log.i(TAG, "Checking notification from ${sbn.packageName}: sender='$from' text='$text'")
         val alert = MessageGuard.assess(sbn.packageName, from, text, watched)
         Guard.record(this, appName(sbn.packageName), kind, alert)
         if (alert != null) {
@@ -91,7 +92,7 @@ class GuardService : NotificationListenerService() {
                 (title.isNotBlank() && !MessageGuard.isUnsavedSender(title) { Guard.isContactSaved(this, it) }) ||
                 (person.isNotBlank() && !MessageGuard.isUnsavedSender(person) { Guard.isContactSaved(this, it) })
 
-            val notificationId = (sbn.packageName + from + text).hashCode()
+            val notificationId = Math.abs((sbn.packageName + from + text).hashCode()) % 100000 + 1000
             Guard.warn(this, alert, notificationId, isKnownContact = isKnown)
             Guard.onAlertCallback?.invoke(alert, appName(sbn.packageName), isKnown)
             if (alert.score >= Guard.SCAM_AT && !isKnown) {
@@ -202,14 +203,31 @@ class GuardService : NotificationListenerService() {
         if (!messages.isNullOrEmpty()) {
             val nonSummaries = messages.map { it.text.toString().trim() }.filter { !MessageGuard.isSummary(it) }
             if (nonSummaries.isNotEmpty()) {
-                val latest = nonSummaries.last()
-                val (_, latestScore) = Signals.compute(latest)
-                if (latestScore >= MessageGuard.THRESHOLD) return latest
+                for (msg in nonSummaries.reversed()) {
+                    val (_, score) = Signals.compute(msg)
+                    if (score >= MessageGuard.THRESHOLD) return msg
+                }
                 return nonSummaries.takeLast(3).joinToString("\n")
             }
         }
 
         val extras = n.extras ?: return null
+
+        // Check raw android.messages Bundle array (standard Android Notification.MessagingStyle used by WhatsApp)
+        @Suppress("DEPRECATION")
+        val rawMessages = extras.getParcelableArray("android.messages")
+        if (!rawMessages.isNullOrEmpty()) {
+            val messageTexts = rawMessages.mapNotNull {
+                (it as? android.os.Bundle)?.getCharSequence("text")?.toString()?.trim()
+            }.filter { it.isNotBlank() && !MessageGuard.isSummary(it) }
+            if (messageTexts.isNotEmpty()) {
+                for (msg in messageTexts.reversed()) {
+                    val (_, score) = Signals.compute(msg)
+                    if (score >= MessageGuard.THRESHOLD) return msg
+                }
+                return messageTexts.takeLast(3).joinToString("\n")
+            }
+        }
 
         val big = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()?.trim()
         if (!big.isNullOrBlank() && !MessageGuard.isSummary(big)) {
@@ -232,6 +250,13 @@ class GuardService : NotificationListenerService() {
 
         val txt = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim()
         if (!txt.isNullOrBlank() && !MessageGuard.isSummary(txt)) return txt
+
+        val ticker = n.tickerText?.toString()?.trim()
+        if (!ticker.isNullOrBlank() && !MessageGuard.isSummary(ticker)) {
+            val cleanTicker = ticker.substringAfter(": ").trim()
+            if (cleanTicker.isNotBlank() && !MessageGuard.isSummary(cleanTicker)) return cleanTicker
+            return ticker
+        }
 
         return if (!big.isNullOrBlank()) big else txt
     }

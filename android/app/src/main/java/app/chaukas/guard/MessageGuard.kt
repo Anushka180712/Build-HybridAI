@@ -48,7 +48,7 @@ object MessageGuard {
     }
 
     /** Shorter than this, a message is counted as checked but cannot carry a scam. */
-    private const val MIN_SCAM_LENGTH = 16
+    private const val MIN_SCAM_LENGTH = 10
 
     /** Warn at "suspicious" or worse (score >= 25), so any real fraud signal raises an alert. */
     const val THRESHOLD = 25
