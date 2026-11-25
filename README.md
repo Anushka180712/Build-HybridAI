@@ -76,7 +76,9 @@ Adding a country is one entry in [`report.ts`](web/src/lib/report.ts). Adding a 
 - A large **Speak** button under the message box: read the message out, and it stops by itself when you pause. Answers can be **read out loud**.
 - **One tap switches the language** to English, हिन्दी, বাংলা, தமிழ், తెలుగు or मराठी: the menus, buttons and result headings change, and the answer comes in that language too (14 answer languages in Settings, behind the gear icon), plus an optional **casual tone**.
 - **Dynamic Multilingual Samples**: One-tap sample chips (QR "refund", KYC update, UPI refund, Electricity bill) populate the text box directly in your chosen language (English, हिन्दी, বাংলা, தமிழ், తెలుగు, मराठी) so non-English speakers can test detection in their mother tongue immediately.
-- **Smart Contact Awareness**: Choose whether a checked message came from an **unknown sender** or a **saved contact**. Risky messages from unknown senders automatically protect the family circle; messages from saved contacts show detailed red flags privately to protect against account takeovers without leaking sensitive chats.
+- **Smart Contact Awareness & Dual Action**:
+  - **Unknown senders**: Risky scam messages (score 65+) automatically record to **Local History** and automatically share with the **Family Circle** group to protect everyone.
+  - **Saved contacts**: When a risky message comes from someone in your phone contacts (e.g. hacked account or SIM swap), Chaukas warns privately and gives two explicit actions: **Share as scam** (adds to Circle & History) or **It's okay** (instantly dismisses without saving or sharing).
 - Risky results show the verdict in your language, three things *not* to do, **Call my family** and **Call 1930** buttons, and **Send to WhatsApp**, which opens WhatsApp with the warning already written (personal details removed, links unclickable).
 
 **Check anything**
@@ -92,6 +94,7 @@ Adding a country is one entry in [`report.ts`](web/src/lib/report.ts). Adding a 
 
 **Understand it**
 - A clear verdict, a 0 to 100 risk score, and every red flag **quoted and highlighted** in the message.
+- **Interactive Red Flag Breakdown**: Tap any red flag to open an expanded view explaining the exact deceptive phrase, psychological trick (e.g. panic cut, fake KYC), and safe next steps.
 - "What to do now" checklist and a safe reply you can copy.
 - **Explain in my language**: Hindi, Bengali, Tamil, Telugu, Marathi, Kannada, Malayalam, Gujarati, Punjabi, Spanish, Japanese, French, Portuguese or English.
 - **Ask a follow-up** ("I already clicked, what now?") with streamed answers. **Read aloud** for anyone who finds small text hard.
@@ -117,7 +120,7 @@ Adding a country is one entry in [`report.ts`](web/src/lib/report.ts). Adding a 
 - **Family Circle**: join with just a name (no email, password or phone number). The name is confirmed once and then stays fixed. Everyone gets a **personal Chaukas ID and QR code** made from the name they gave plus four digits (like `riya-4821`; names in Hindi, Bengali, Tamil or Telugu script are spelled in Latin letters, so नानी becomes `nani-0712`). Scanning someone's QR or typing their ID opens a **Keep or not** popup; Keep makes your family group with them on the spot, and they get the same popup on their phone. Each person can be in **up to two groups**, sees every member with their Chaukas ID, and can **Keep or Don't keep** an invite later from a *Waiting for you* list. Messages scoring **65 or more** are **shared with the group automatically** (safe messages never are), and group warnings **disappear after 3 days**. Family can react (*I got this too*, *I'll call you*) or forward a warning. A **one-tap WhatsApp or SMS link** brings in people who don't have Chaukas yet. When someone shares a warning, the rest of the group gets a **notification** (while Chaukas is open or in a background tab).
 - **Group Code side-by-side & quick join**: Groups prominently display a 6-character Group Code (`Code: ABC123`) right beside the group name with 1-tap copy. Family members who don't have a QR scanner can easily join using this code, even if already participating in another circle (up to 2 groups).
 - **Forward a warning on WhatsApp or SMS**: personal details removed and scam links made unclickable (`bad[.]top`), so nobody taps them by accident.
-- **Scam Dojo**: an interactive training game on both Web and Android, fully localized across 6 Indian languages (English, Hindi, Bengali, Tamil, Telugu, Marathi), where Gemini creates real-looking scams and genuine messages to train your detection instincts.
+- **Scam Dojo (Instant 0ms load)**: an interactive training game on both Web and Android, fully localized across 6 Indian languages (English, Hindi, Bengali, Tamil, Telugu, Marathi), with instant offline scenarios and background AI round generation to train your detection instincts.
 - **History and insights**: what is targeting you, the tricks you see most and how often checks stayed on your device.
 
 </td>
@@ -156,7 +159,7 @@ The people most at risk are the least likely to copy a message into another app.
 
 | | How it works | Where the first check runs |
 |---|---|---|
-| **Android: automatic warnings** | Opt in once. When a new SMS or WhatsApp message arrives from an **unsaved or unknown number**, Chaukas checks it in memory. If it looks like a scam (score 65+), a high-priority heads-up notification warns you *before you open it*, automatically records the check into **Local History**, and posts the warning to your **Family Circle** group so loved ones are protected. If a scam text arrives from a **saved contact**, Chaukas posts a private warning explaining why red flags were detected (e.g. account takeover or SIM swap) without ever auto-sharing to the group. Separate switches for **SMS** and **WhatsApp**, live activity status indicators, and clean controls. | Fully on the phone, from the local scam signals. Message text is never stored or sent without redaction. |
+| **Android: 24/7 background warnings** | Opt in once. Runs as an unkillable foreground shield service (`GuardService`) with a direct telephony receiver (`SmsReceiver`, priority 999) and boot restarter (`GuardBootReceiver`). When a new SMS or WhatsApp message arrives while the **app is closed, killed, or screen is off**, Chaukas assesses it in memory: <br>• **Unknown Senders**: High-risk scams (score 65+) immediately post a warning notification, auto-record to **Local History**, and auto-share to your **Family Circle** group.<br>• **Saved Contacts**: Shows a private warning with **Share as scam** and **It's okay** buttons directly on the notification, the expanded screen, and red flag dialogs.<br>• Battery optimization bypass ensures aggressive OEM task killers (Xiaomi, Samsung, Vivo, Oppo) never freeze protection. | Fully on the phone, from local scam signals and on-device NLP. Message text is never stored or sent without redaction. |
 | **Android: share or select** | Long-press a message → **Share → Chaukas**, or select text → **Check with Chaukas**. Shared screenshots are read on the phone (Latin and Devanagari scripts). | ML Kit text recognition on the phone, then the hybrid check |
 | **iOS: share sheet** | Select a message → **Share → Chaukas**. A card shows an instant verdict, and **Full check in Chaukas** opens the hybrid check. A Shortcuts link (`chaukas://check?text=`) works too. | Instant verdict in the share extension, on the iPhone |
 | **Web: installed app** | Install Chaukas from Chrome, then share text or a screenshot to it from any app. The check starts by itself. | The browser, with Gemini Nano when available |
@@ -164,11 +167,17 @@ The people most at risk are the least likely to copy a message into another app.
 **How the Android warnings stay private and within Play policy.** The feature is off by default. Turning it on shows a plain-language explanation first, then the system's own *Notification access* page, where the user grants it. Only notifications from messaging apps are read, only their text, and only in memory to compute the local scam signals ([`MessageGuard.kt`](android/app/src/main/java/app/chaukas/guard/MessageGuard.kt)). No model is called and no message text is logged or uploaded. To show that checking works, the phone keeps a count of today's checks and the app name, time and score of recent warnings, which are dropped after 3 days. The user can turn it off in the app or in Settings at any time. The full hybrid check (with redaction) runs only when the user taps a warning.
 
 ```mermaid
-flowchart LR
-  N[New SMS or WhatsApp<br/>notification] --> G{Local scam signals<br/>on the phone}
-  G -- score under 45 --> Q[Stay quiet]
-  G -- suspicious or scam --> W[Warning notification]
-  W -- tap --> H[Full check:<br/>Gemini Nano on-device,<br/>redacted cloud fallback]
+flowchart TD
+  N[Incoming SMS or WhatsApp message<br/>App closed, killed, or in foreground] --> REC{SmsReceiver or<br/>GuardService}
+  REC --> SIG{Local scam signals<br/>in memory on device}
+  SIG -- score under 45 --> Q[Stay quiet]
+  SIG -- score 65+ scam --> CHK{Sender in saved<br/>phone contacts?}
+  CHK -- Unknown Sender --> UNK[Warning notification<br/>+ Auto-save to History<br/>+ Auto-share to Family Circle]
+  CHK -- Saved Contact --> KNW[Private Warning Notification<br/>No auto-share]
+  KNW --> ACT{User Choice on screen / notif}
+  ACT -- "Share as scam" --> SHR[Add to History & Family Circle]
+  ACT -- "It's okay" --> DIS[Dismiss cleanly<br/>Not saved or shared]
+  UNK -- tap notification --> RES[Expanded Result Screen<br/>Shows Auto-Shared Badge]
 ```
 
 ## A 3-minute tour
@@ -427,7 +436,11 @@ gcloud firestore fields ttls update expireAt --collection-group=alerts --enable-
 │   ├── src/styles/           design tokens and component styles
 │   └── src/__tests__/        unit tests
 ├── android/                  Kotlin + Jetpack Compose (app.chaukas)
-│   └── app/src/main/java/app/chaukas/   ai/ (HybridEngine, Redactor, Signals), guard/ (automatic warnings), data/, ui/
+│   └── app/src/main/java/app/chaukas/
+│       ├── ai/               HybridEngine, Redactor, Signals
+│       ├── guard/            GuardService (24/7 foreground), SmsReceiver (OS SMS), GuardBootReceiver, GuardActionReceiver, MessageGuard
+│       ├── data/             Repository, LocalHistory, I18n
+│       └── ui/               ChaukasRoot, CheckScreen, HistoryScreen, FamilyScreen, DojoScreen, EngineScreen
 ├── ios/                      SwiftUI, generated with XcodeGen
 │   ├── Chaukas/              HybridEngine, Redactor, Signals, Repository, Views
 │   ├── ChaukasShare/         share extension with an instant verdict
