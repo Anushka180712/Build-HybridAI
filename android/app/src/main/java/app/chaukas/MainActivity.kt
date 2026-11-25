@@ -90,8 +90,15 @@ class MainActivity : ComponentActivity() {
             vm.checkImage(this, uri)
             return
         }
-        val isKnown = intent.getBooleanExtra(Guard.EXTRA_IS_KNOWN, false)
         val from = intent.getStringExtra(Guard.EXTRA_FROM).orEmpty()
+        val isKnown = if (intent.hasExtra(Guard.EXTRA_IS_KNOWN)) {
+            intent.getBooleanExtra(Guard.EXTRA_IS_KNOWN, false)
+        } else if (from.isNotBlank()) {
+            Guard.isSenderKnown(this, from)
+        } else {
+            false
+        }
+        val autoShare = intent.getBooleanExtra("auto_share", false)
         val shared = when (intent.action) {
             Intent.ACTION_SEND, Guard.ACTION_CHECK -> intent.getStringExtra(Intent.EXTRA_TEXT)
             Intent.ACTION_PROCESS_TEXT -> intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()
@@ -99,7 +106,7 @@ class MainActivity : ComponentActivity() {
         }
         if (!shared.isNullOrBlank()) {
             vm.text = shared
-            vm.check(isKnown = isKnown, fromSender = from)
+            vm.check(isKnown = isKnown, fromSender = from, autoShare = autoShare)
         }
     }
 }

@@ -85,12 +85,7 @@ class GuardService : NotificationListenerService() {
             val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(sbn.notification)
             val person = style?.messages?.lastOrNull { !it.text.isNullOrBlank() }?.person?.name?.toString().orEmpty()
 
-            val isKnown = Guard.isContactSaved(this, from) ||
-                (title.isNotBlank() && Guard.isContactSaved(this, title)) ||
-                (person.isNotBlank() && Guard.isContactSaved(this, person)) ||
-                !MessageGuard.isUnsavedSender(from) { Guard.isContactSaved(this, it) } ||
-                (title.isNotBlank() && !MessageGuard.isUnsavedSender(title) { Guard.isContactSaved(this, it) }) ||
-                (person.isNotBlank() && !MessageGuard.isUnsavedSender(person) { Guard.isContactSaved(this, it) })
+            val isKnown = Guard.isSenderKnown(this, from, title, person)
 
             val notificationId = Math.abs((sbn.packageName + from + text).hashCode()) % 100000 + 1000
             Guard.warn(this, alert, notificationId, isKnownContact = isKnown)
@@ -530,11 +525,12 @@ object Guard {
     /**
      * Simulates receiving a high-risk scam message to test the notification warning and scanner flow.
      */
-    fun simulateTestAlert(ctx: Context, kind: String = "sms"): Boolean {
+    fun simulateTestAlert(ctx: Context, kind: String = "sms", forceKnown: Boolean? = null): Boolean {
         setOn(ctx, true)
+        val isKnown = forceKnown ?: (kind == "known")
         val text = if (kind == "sms") TEST_SCAM_SMS else TEST_SCAM_CHAT
         val app = if (kind == "sms") "Messages" else "WhatsApp"
-        val from = if (kind == "sms") "BP-DHBVN" else "+91 98765 43210"
+        val from = if (isKnown) "Priya (Saved Contact)" else (if (kind == "sms") "BP-DHBVN" else "+91 98765 43210")
         val alert = MessageGuard.assess(
             if (kind == "sms") "com.google.android.apps.messaging" else "com.whatsapp",
             from,
@@ -546,10 +542,10 @@ object Guard {
             from = from,
         )
         record(ctx, app, kind, alert)
-        val isUnsaved = MessageGuard.isUnsavedSender(from) { isContactSaved(ctx, it) }
-        warn(ctx, alert, (System.currentTimeMillis() % 10000).toInt() + 100, isKnownContact = !isUnsaved)
-        onAlertCallback?.invoke(alert, app, !isUnsaved)
-        if (alert.score >= SCAM_AT && isUnsaved) {
+        val notificationId = (System.currentTimeMillis() % 10000).toInt() + 100
+        warn(ctx, alert, notificationId, isKnownContact = isKnown)
+        onAlertCallback?.invoke(alert, app, isKnown)
+        if (alert.score >= SCAM_AT && !isKnown) {
             onScamDetected(ctx, app, kind, alert)
         }
         return true
@@ -603,6 +599,7 @@ object Guard {
                 putExtra(EXTRA_IS_KNOWN, true)
                 putExtra(EXTRA_FROM, alert.from)
                 putExtra(EXTRA_SCORE, alert.score)
+                putExtra("auto_share", true)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
             val sharePending = PendingIntent.getActivity(
@@ -614,6 +611,18 @@ object Guard {
             builder.addAction(0, "Share as scam", sharePending)
 
             // Action 2: Quick dismiss "It's okay"
+            val dismissIntent = Intent(ctx, GuardActionReceiver::class.java).apply {
+                putExtra("notification_id", id)
+            }
+            val dismissPending = PendingIntent.getBroadcast(
+                ctx,
+                id + 2,
+                dismissIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            builder.addAction(0, "It's okay", dismissPending)
+        } else {
+            // Unknown sender: quick dismiss action
             val dismissIntent = Intent(ctx, GuardActionReceiver::class.java).apply {
                 putExtra("notification_id", id)
             }
@@ -636,6 +645,35 @@ object Guard {
     }
 
     /**
+     * Determines whether a sender is a known/saved contact or an unknown/unsaved sender.
+     * When READ_CONTACTS permission is granted, checks the phonebook database.
+     * When not granted, checks for phone number patterns, SMS headers, or ~pushName markers.
+     */
+    fun isSenderKnown(ctx: Context, from: String, title: String = "", person: String = ""): Boolean {
+        val hasContacts = ctx.checkSelfPermission(android.Manifest.permission.READ_CONTACTS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        // 1. If any candidate matches an actual contact saved in the phone:
+        if (isContactSaved(ctx, from) ||
+            (title.isNotBlank() && isContactSaved(ctx, title)) ||
+            (person.isNotBlank() && isContactSaved(ctx, person))
+        ) {
+            return true
+        }
+
+        // 2. If contacts permission is granted and no match was found, it is definitely not saved:
+        if (hasContacts) return false
+
+        // 3. Fallback heuristic when contacts permission has not been granted:
+        val candidate = when {
+            from.isNotBlank() -> from
+            title.isNotBlank() -> title
+            else -> person
+        }
+        if (candidate.isBlank()) return false
+        return !MessageGuard.isUnsavedSender(candidate) { isContactSaved(ctx, it) }
+    }
+
+    /**
      * Checks if the sender string matches a saved contact in the phone's contacts database,
      * if READ_CONTACTS permission has been granted. Checks both phone numbers and display names.
      */
@@ -650,16 +688,22 @@ object Guard {
             // In WhatsApp notifications, ONLY saved contacts appear as plain display names (e.g. "Pooja", "Mom")
             // without phone numbers or ~ prefixes.
             val hasDigits = clean.any { it.isDigit() }
+            val lower = clean.lowercase()
+            val isGenericService = lower.contains("officer") || lower.contains("support") || lower.contains("care") ||
+                lower.contains("bank") || lower.contains("service") || lower.contains("help") ||
+                lower.contains("info") || lower.contains("alert") || lower.contains("notice") ||
+                lower.contains("telecom") || lower.contains("update")
             if (!hasDigits && !clean.startsWith("~") && !clean.contains("+") && clean.length in 2..40 &&
                 !clean.equals("unknown", ignoreCase = true) && !clean.equals("unknown sender", ignoreCase = true) &&
-                !Regex("""^[A-Za-z]{2}-[A-Za-z0-9]{3,8}$""").matches(clean)) {
+                !Regex("""^[A-Za-z]{2}-[A-Za-z0-9]{3,8}$""").matches(clean) && !isGenericService) {
                 return true
             }
             return false
         }
 
         // 1. Phone number lookups (both national and international formats)
-        val digits = clean.filter { it.isDigit() }
+        val phonePattern = Regex("""(\+?\d[\d -]{7,15}\d)""").find(clean)
+        val digits = (phonePattern?.value ?: clean).filter { it.isDigit() }
         if (digits.length in 7..16) {
             val last10 = if (digits.length >= 10) digits.takeLast(10) else digits
 

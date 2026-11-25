@@ -293,7 +293,7 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
         }.getOrNull()
     }
 
-    fun check(isKnown: Boolean? = null, fromSender: String = "") {
+    fun check(isKnown: Boolean? = null, fromSender: String = "", autoShare: Boolean = false) {
         if (text.isBlank() && attachedImageUri == null && attachedBitmap == null) return
         if (busy) return
         busy = true
@@ -326,7 +326,7 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
                 } else {
                     val r = engine.analyze(text, mode, redact, emptyList(), language)
                     run = r
-                    if (!effectiveIsKnown && r.analysis.verdict != Verdict.SAFE && r.analysis.riskScore >= 60) {
+                    if ((autoShare || !effectiveIsKnown) && r.analysis.verdict != Verdict.SAFE && r.analysis.riskScore >= 60) {
                         saveCurrentRunToHistory()
                     } else {
                         isSavedToHistory = false
@@ -376,7 +376,7 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
                     redactions = 0,
                 )
                 run = fallbackRun
-                if (!effectiveIsKnown && score >= 60) {
+                if ((autoShare || !effectiveIsKnown) && score >= 60) {
                     saveCurrentRunToHistory()
                 } else {
                     isSavedToHistory = false
@@ -404,7 +404,7 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
         saveRun(r)
         Repository.saveCheck(r)
         isSavedToHistory = true
-        if (r.analysis.verdict != Verdict.SAFE && r.analysis.riskScore >= 65) {
+        if (r.analysis.verdict != Verdict.SAFE && r.analysis.riskScore >= 60) {
             viewModelScope.launch {
                 runCatching { Repository.autoShareToCircles(r) }
             }

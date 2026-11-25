@@ -105,8 +105,8 @@ private enum class Tab(val label: String, val icon: ImageVector, val tint: Color
 @Composable
 fun ChaukasRoot(vm: ChaukasViewModel) {
     var tab by remember { mutableStateOf(Tab.CHECK) }
-    LaunchedEffect(vm.run) {
-        if (vm.run != null) {
+    LaunchedEffect(vm.run, vm.busy) {
+        if (vm.run != null || vm.busy) {
             tab = Tab.CHECK
         }
     }
@@ -789,33 +789,6 @@ private fun CheckScreen(vm: ChaukasViewModel, onGoToFamily: () -> Unit) {
                 fontSize = 13.sp,
                 lineHeight = 18.sp,
             )
-
-            // Known vs unknown contact toggle pill
-            Surface(
-                onClick = { vm.isKnownContact = !vm.isKnownContact },
-                shape = RoundedCornerShape(12.dp),
-                color = if (vm.isKnownContact) Chaukas.Mint100 else Chaukas.Paper2,
-                border = BorderStroke(1.dp, if (vm.isKnownContact) Chaukas.Mint300 else Chaukas.Line),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = if (vm.isKnownContact) Icons.Outlined.Shield else Icons.Outlined.Warning,
-                        contentDescription = null,
-                        tint = if (vm.isKnownContact) Chaukas.Mint700 else Chaukas.Ink2,
-                        modifier = Modifier.size(14.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = if (vm.isKnownContact) I18n.t("From saved contact (private)", vm.language) else I18n.t("From unknown sender", vm.language),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = if (vm.isKnownContact) Chaukas.Mint700 else Chaukas.Ink2,
-                    )
-                }
-            }
         }
 
         // Big Bright Check Button (Teal-green gradient)
@@ -3609,7 +3582,7 @@ private fun AutoScanToggleBar(language: String = "English") {
                             )
                         }
 
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Surface(
                                 onClick = { onRunTest("chat") },
                                 shape = RoundedCornerShape(6.dp),
@@ -3617,13 +3590,13 @@ private fun AutoScanToggleBar(language: String = "English") {
                                 border = BorderStroke(1.dp, Color(0xFFA5D6A7)),
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Icon(Icons.Outlined.PlayArrow, null, tint = Color(0xFF1B5E20), modifier = Modifier.size(11.dp))
                                     Spacer(Modifier.width(2.dp))
                                     Text(
-                                        text = I18n.t("Test WhatsApp", language),
+                                        text = "WhatsApp",
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color(0xFF1B5E20),
@@ -3638,16 +3611,37 @@ private fun AutoScanToggleBar(language: String = "English") {
                                 border = BorderStroke(1.dp, Color(0xFFBFDBFE)),
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Icon(Icons.Outlined.PlayArrow, null, tint = Color(0xFF1E40AF), modifier = Modifier.size(11.dp))
                                     Spacer(Modifier.width(2.dp))
                                     Text(
-                                        text = I18n.t("Test SMS", language),
+                                        text = "SMS",
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color(0xFF1E40AF),
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                onClick = { onRunTest("known") },
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFFFFF3E0),
+                                border = BorderStroke(1.dp, Color(0xFFFFB74D)),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(Icons.Outlined.PlayArrow, null, tint = Color(0xFFE65100), modifier = Modifier.size(11.dp))
+                                    Spacer(Modifier.width(2.dp))
+                                    Text(
+                                        text = I18n.t("Saved contact", language),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFE65100),
                                     )
                                 }
                             }
