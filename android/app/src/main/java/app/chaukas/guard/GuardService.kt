@@ -367,7 +367,7 @@ object Guard {
     const val KEEP_MS = 3L * 24 * 60 * 60 * 1000
 
     /** Risk at which a warning is called a scam rather than "be careful". */
-    const val SCAM_AT = 60
+    const val SCAM_AT = 65
 
     /** One warning: when, which app, its score and the top reasons. No message text is kept. */
     data class Entry(val at: Long, val app: String, val score: Int?, val reasons: String = "") {
@@ -608,7 +608,7 @@ object Guard {
                 shareIntent,
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
-            builder.addAction(0, "Share as scam", sharePending)
+            builder.addAction(0, "Mark as scam", sharePending)
 
             // Action 2: Quick dismiss "It's okay"
             val dismissIntent = Intent(ctx, GuardActionReceiver::class.java).apply {

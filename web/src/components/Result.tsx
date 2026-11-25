@@ -150,7 +150,7 @@ export function Result({
                 }}
                 disabled={savedToHistory}
               >
-                <Icon name="share" /> {savedToHistory ? t('Shared to circle & history') : t('Share as scam')}
+                <Icon name="share" /> {savedToHistory ? t('Shared to circle & history') : t('Mark as scam')}
               </button>
               <button
                 type="button"
@@ -166,11 +166,22 @@ export function Result({
           </div>
         )}
         {!isKnownContact && a.verdict !== 'safe' && a.riskScore >= 65 && (
-          <div className="card" style={{ background: 'var(--mint-50, #f0faf4)', border: '1px solid var(--mint-600, #2f8f6b)', padding: '10px 14px', margin: '10px 0', borderRadius: 10 }}>
+          <div className="card" style={{ background: 'var(--mint-50, #f0faf4)', border: '1px solid var(--mint-600, #2f8f6b)', padding: '10px 14px', margin: '10px 0', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div className="row" style={{ alignItems: 'center', gap: 8, color: 'var(--mint-700, #1e6140)', fontWeight: 600, fontSize: 13 }}>
               <Icon name="shield" style={{ width: 16, height: 16 }} />
               <span>{t('Auto-shared to Family Circle & saved to History')}</span>
             </div>
+            <button
+              type="button"
+              className="btn sm ghost"
+              style={{ padding: '3px 8px', fontSize: 12 }}
+              onClick={() => {
+                onDismiss?.();
+                toast(t("Dismissed"), 'x');
+              }}
+            >
+              <Icon name="shieldCheck" /> {t("It's okay")}
+            </button>
           </div>
         )}
         <div className="verdict-actions">

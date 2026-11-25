@@ -300,13 +300,20 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
         error = null
         run = null
         stage = 0
-        if (isKnown != null) {
-            isKnownContact = isKnown
+        isKnownContact = isKnown ?: false
+        senderName = fromSender
+        if (senderName.isBlank() && isKnown == null) {
+            val senderMatch = Regex("""^(?:\[.*?\]\s*)?([A-Za-z0-9 +~()_-]{2,30}):\s*""").find(text)
+            val extracted = senderMatch?.groupValues?.get(1)?.trim().orEmpty()
+            if (extracted.isNotBlank()) {
+                val isSaved = runCatching { app.chaukas.guard.Guard.isSenderKnown(getApplication(), extracted) }.getOrDefault(false)
+                if (isSaved) {
+                    isKnownContact = true
+                    senderName = extracted
+                }
+            }
         }
-        if (fromSender.isNotBlank()) {
-            senderName = fromSender
-        }
-        val effectiveIsKnown = isKnown ?: isKnownContact
+        val effectiveIsKnown = isKnownContact
         isSavedToHistory = false
 
         // Stage progress animation
@@ -326,7 +333,7 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
                 } else {
                     val r = engine.analyze(text, mode, redact, emptyList(), language)
                     run = r
-                    if ((autoShare || !effectiveIsKnown) && r.analysis.verdict != Verdict.SAFE && r.analysis.riskScore >= 60) {
+                    if ((autoShare || !effectiveIsKnown) && r.analysis.verdict != Verdict.SAFE && r.analysis.riskScore >= 65) {
                         saveCurrentRunToHistory()
                     } else {
                         isSavedToHistory = false
@@ -376,7 +383,7 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
                     redactions = 0,
                 )
                 run = fallbackRun
-                if ((autoShare || !effectiveIsKnown) && score >= 60) {
+                if ((autoShare || !effectiveIsKnown) && score >= 65) {
                     saveCurrentRunToHistory()
                 } else {
                     isSavedToHistory = false
@@ -404,7 +411,7 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
         saveRun(r)
         Repository.saveCheck(r)
         isSavedToHistory = true
-        if (r.analysis.verdict != Verdict.SAFE && r.analysis.riskScore >= 60) {
+        if (r.analysis.verdict != Verdict.SAFE && r.analysis.riskScore >= 65) {
             viewModelScope.launch {
                 runCatching { Repository.autoShareToCircles(r) }
             }

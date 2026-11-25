@@ -1239,7 +1239,7 @@ private fun ResultView(
                                 Icon(Icons.Outlined.Share, null, modifier = Modifier.size(15.dp))
                                 Spacer(Modifier.width(4.dp))
                                 Text(
-                                    if (vm.isSavedToHistory) I18n.t("Shared to circle & history", vm.language) else I18n.t("Share as scam", vm.language),
+                                    if (vm.isSavedToHistory) I18n.t("Shared to circle & history", vm.language) else I18n.t("Mark as scam", vm.language),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp,
                                 )
@@ -1480,7 +1480,7 @@ private fun ResultView(
                                 shape = RoundedCornerShape(12.dp),
                             ) {
                                 Text(
-                                    if (vm.isSavedToHistory) I18n.t("Shared to circle & history", vm.language) else I18n.t("Share as scam", vm.language),
+                                    if (vm.isSavedToHistory) I18n.t("Shared to circle & history", vm.language) else I18n.t("Mark as scam", vm.language),
                                 )
                             }
                             OutlinedButton(

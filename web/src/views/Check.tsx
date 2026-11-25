@@ -147,14 +147,18 @@ export function CheckView() {
         toast(t('Read on this phone. Only the words were checked, with personal details removed.'));
       }
       setRun(r);
-      if (!isKnownContact && r.analysis.verdict !== 'safe' && r.analysis.riskScore >= 65) {
+      const senderMatch = /^(?:\[.*?\]\s*)?([A-Za-z0-9 +~()_-]{2,30}):\s*/.exec(text);
+      const extractedSender = senderMatch ? senderMatch[1].trim() : '';
+      const isKnown = extractedSender ? !/^\+?\d{7,16}$|^[A-Za-z]{2}-[A-Za-z0-9]{3,8}$|^unknown$/i.test(extractedSender) : false;
+      setIsKnownContact(isKnown);
+      if (!isKnown && r.analysis.verdict !== 'safe' && r.analysis.riskScore >= 65) {
         saveRun(r);
         setSavedToHistory(true);
         autoShareToCircles(r).then((names) => names.length && toast(`${t('Auto-shared to Family Circle & saved to History')}`), () => undefined);
       } else {
         setSavedToHistory(false);
       }
-      if (isKnownContact && r.analysis.verdict !== 'safe' && r.analysis.riskScore >= 65) {
+      if (isKnown && r.analysis.verdict !== 'safe' && r.analysis.riskScore >= 65) {
         const flags = r.analysis.redFlags.map((f) => f.label).join(' · ');
         toast(`${t('Red flags detected from contact:')} ${flags}. ${t('Kept private to protect your contact.')}`, 'alert');
       }
@@ -440,18 +444,6 @@ export function CheckView() {
             options={(['private', 'smart', 'cloud'] as PrivacyMode[]).map((m) => ({ value: m, label: t(MODE_COPY[m].title), icon: MODE_COPY[m].icon }))}
           />
           <p className="mode-line">{t(MODE_COPY[settings.mode].line)}</p>
-          <div className="row wrap" style={{ gap: 8, marginTop: 6 }}>
-            <button
-              type="button"
-              className={`chip xs ${isKnownContact ? 'on' : ''}`}
-              style={{ cursor: 'pointer', background: isKnownContact ? 'var(--mint-100, #d0f4de)' : 'var(--surface-sunken)', border: '1px solid var(--border)' }}
-              onClick={() => setIsKnownContact((k) => !k)}
-              title={isKnownContact ? t('Sender is a saved contact: warnings stay private to you') : t('Sender is unknown: scams (65+) auto-share to Family Circle')}
-            >
-              <Icon name={isKnownContact ? 'user' : 'alert'} style={{ width: 13, height: 13 }} />
-              <span>{isKnownContact ? t('From saved contact (private)') : t('From unknown sender')}</span>
-            </button>
-          </div>
         </div>
         <button className="btn primary lg check-btn" onClick={() => void run_()} disabled={busy || (!text.trim() && !image)}>
           {busy ? (
