@@ -3,7 +3,7 @@
  * model cannot bias the answer.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { generateDojoRound, ChaukasError, type DojoRound } from '../ai/engine';
+import { generateDojoRound, type DojoRound } from '../ai/engine';
 import type { DojoBrief } from '../ai/prompts';
 import { settingsStore } from '../data/settings';
 import { createStore } from '../lib/store';
@@ -11,6 +11,7 @@ import { rcStore } from '../lib/appState';
 import { Icon } from '../components/Icon';
 import { SourceBadge } from '../components/ui';
 import { useT } from '../lib/i18n';
+import { getInstantDojoRound } from '../data/dojoCurated';
 
 const THEMES = [
   'a parcel delivery',
@@ -60,7 +61,7 @@ export function DojoView() {
   const rc = rcStore.use();
   const settings = settingsStore.use();
   const lang = settings.language;
-  const [round, setRound] = useState<DojoRound | null>(null);
+  const [round, setRound] = useState<DojoRound | null>(() => getInstantDojoRound(lang));
   const [guess, setGuess] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,20 +77,27 @@ export function DojoView() {
     setError(null);
     setGuess(null);
     try {
-      const r = await (next.current ?? fetchRound());
+      // If next round was prefetched, use it; otherwise fetch or fallback to instant round
+      const r = next.current ? await next.current : await Promise.race([
+        fetchRound(),
+        new Promise<DojoRound>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500)),
+      ]);
       next.current = null;
       setRound(r);
-    } catch (e) {
+    } catch {
       next.current = null;
-      setError(e instanceof ChaukasError ? `${e.message} ${e.hint ?? ''}` : String(e));
+      setRound(getInstantDojoRound(lang));
     } finally {
       setBusy(false);
     }
-  }, [fetchRound]);
+  }, [fetchRound, lang]);
 
+  // Preload next round in background on mount
   useEffect(() => {
-    if (!round && !busy && !error) load();
-  }, [round, busy, error, load]);
+    if (!next.current) {
+      next.current = fetchRound().catch(() => getInstantDojoRound(lang));
+    }
+  }, [fetchRound, lang]);
 
   const answer = (saysScam: boolean) => {
     if (!round || guess !== null) return;
@@ -101,9 +109,8 @@ export function DojoView() {
       streak: right ? s.streak + 1 : 0,
       best: Math.max(s.best, right ? s.streak + 1 : 0),
     }));
-    // Prepare the next round while the person reads the explanation.
-    next.current = fetchRound();
-    next.current.catch(() => undefined);
+    // Prepare the next round in background while the person reads the explanation
+    next.current = fetchRound().catch(() => getInstantDojoRound(lang));
   };
 
   const rank = [...RANKS].reverse().find((r) => stats.correct >= r.at)!;
