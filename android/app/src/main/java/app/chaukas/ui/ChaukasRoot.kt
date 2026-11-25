@@ -105,6 +105,11 @@ private enum class Tab(val label: String, val icon: ImageVector, val tint: Color
 @Composable
 fun ChaukasRoot(vm: ChaukasViewModel) {
     var tab by remember { mutableStateOf(Tab.CHECK) }
+    LaunchedEffect(vm.run) {
+        if (vm.run != null) {
+            tab = Tab.CHECK
+        }
+    }
     Scaffold(
         containerColor = Chaukas.Paper,
         bottomBar = {
@@ -3226,6 +3231,9 @@ private fun AutoScanToggleBar(language: String = "English") {
     var watchSms by remember { mutableStateOf(Guard.watches(ctx, "sms")) }
     var watchChat by remember { mutableStateOf(Guard.watches(ctx, "chat")) }
     var isOptimized by remember { mutableStateOf(Guard.isBatteryOptimized(ctx)) }
+    var hasContactsPermission by remember {
+        mutableStateOf(ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED)
+    }
     var explain by remember { mutableStateOf(false) }
 
     LifecycleResumeEffect(Unit) {
@@ -3234,13 +3242,16 @@ private fun AutoScanToggleBar(language: String = "English") {
         watchSms = Guard.watches(ctx, "sms")
         watchChat = Guard.watches(ctx, "chat")
         isOptimized = Guard.isBatteryOptimized(ctx)
+        hasContactsPermission = ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
         if (on && access) {
             Guard.start(ctx)
         }
         onPauseOrDispose { }
     }
 
-    val requestContacts = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
+    val requestContacts = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        hasContactsPermission = granted
+    }
 
     val notify = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
@@ -3504,39 +3515,118 @@ private fun AutoScanToggleBar(language: String = "English") {
 
             if (active && isOptimized) {
                 Surface(
-                    onClick = {
-                        Guard.requestIgnoreBatteryOptimization(ctx)
-                    },
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFFFEF3F2),
-                    border = BorderStroke(1.dp, Color(0xFFFECDCA)),
-                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { Guard.requestIgnoreBatteryOptimization(ctx) },
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFFFFBEB),
+                    border = BorderStroke(1.dp, Color(0xFFFDE68A)),
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(
-                            Icons.Outlined.Warning,
-                            null,
-                            tint = Color(0xFFB42318),
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = I18n.t("Allow background run so scam alerts work when app is closed", language),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFFB42318),
-                            modifier = Modifier.weight(1f),
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            text = I18n.t("Fix", language),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFB42318),
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFFEF3C7)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Outlined.Bolt,
+                                contentDescription = null,
+                                tint = Color(0xFFD97706),
+                                modifier = Modifier.size(17.dp),
+                            )
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = I18n.t("Keep active when app is closed", language),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF92400E),
+                            )
+                            Spacer(Modifier.height(1.dp))
+                            Text(
+                                text = I18n.t("Allow background run so scam warnings never stop", language),
+                                fontSize = 11.sp,
+                                color = Color(0xFFB45309),
+                                lineHeight = 14.sp,
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFFD97706),
+                        ) {
+                            Text(
+                                text = I18n.t("Allow", language),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (active && !hasContactsPermission) {
+                Surface(
+                    onClick = { requestContacts.launch(Manifest.permission.READ_CONTACTS) },
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFEFF6FF),
+                    border = BorderStroke(1.dp, Color(0xFFBFDBFE)),
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFDBEAFE)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Outlined.PermContactCalendar,
+                                contentDescription = null,
+                                tint = Color(0xFF2563EB),
+                                modifier = Modifier.size(17.dp),
+                            )
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = I18n.t("Identify saved contacts", language),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1E40AF),
+                            )
+                            Spacer(Modifier.height(1.dp))
+                            Text(
+                                text = I18n.t("Enable Contacts to distinguish friends from unknown numbers", language),
+                                fontSize = 11.sp,
+                                color = Color(0xFF1D4ED8),
+                                lineHeight = 14.sp,
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFF2563EB),
+                        ) {
+                            Text(
+                                text = I18n.t("Allow", language),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            )
+                        }
                     }
                 }
             }

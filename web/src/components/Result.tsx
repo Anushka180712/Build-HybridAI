@@ -51,11 +51,15 @@ export function Result({
   onChange,
   savedToHistory = true,
   onSaveToHistory,
+  isKnownContact = false,
+  onDismiss,
 }: {
   run: AnalysisRun;
   onChange?: (r: AnalysisRun) => void;
   savedToHistory?: boolean;
   onSaveToHistory?: (r?: AnalysisRun) => void;
+  isKnownContact?: boolean;
+  onDismiss?: () => void;
 }) {
   const a = run.analysis;
   const rc = rcStore.use();
@@ -126,6 +130,49 @@ export function Result({
             </div>
           </div>
         </div>
+        {isKnownContact && a.verdict !== 'safe' && (
+          <div className="card" style={{ background: '#FFF8F0', border: '1px solid #FFB74D', padding: 14, margin: '12px 0', borderRadius: 12 }}>
+            <div className="row" style={{ alignItems: 'center', gap: 8, color: '#E65100', fontWeight: 'bold' }}>
+              <Icon name="alert" style={{ width: 18, height: 18 }} />
+              <span>{t('Message from saved contact')}</span>
+            </div>
+            <p style={{ fontSize: 13, color: '#4A5568', margin: '6px 0 12px', lineHeight: '18px' }}>
+              {t('This sender is in your contacts, but this message has red flags. Their account may be compromised. Choose what to do:')}
+            </p>
+            <div className="row wrap" style={{ gap: 8 }}>
+              <button
+                type="button"
+                className="btn sm"
+                style={{ background: '#C62828', color: '#FFF' }}
+                onClick={() => {
+                  onSaveToHistory?.(run);
+                  toast(t('Shared as scam to circle & history'), 'check');
+                }}
+                disabled={savedToHistory}
+              >
+                <Icon name="share" /> {savedToHistory ? t('Shared to circle & history') : t('Share as scam')}
+              </button>
+              <button
+                type="button"
+                className="btn sm ghost"
+                onClick={() => {
+                  onDismiss?.();
+                  toast(t("Dismissed"), 'x');
+                }}
+              >
+                <Icon name="shieldCheck" /> {t("It's okay")}
+              </button>
+            </div>
+          </div>
+        )}
+        {!isKnownContact && a.verdict !== 'safe' && a.riskScore >= 65 && (
+          <div className="card" style={{ background: 'var(--mint-50, #f0faf4)', border: '1px solid var(--mint-600, #2f8f6b)', padding: '10px 14px', margin: '10px 0', borderRadius: 10 }}>
+            <div className="row" style={{ alignItems: 'center', gap: 8, color: 'var(--mint-700, #1e6140)', fontWeight: 600, fontSize: 13 }}>
+              <Icon name="shield" style={{ width: 16, height: 16 }} />
+              <span>{t('Auto-shared to Family Circle & saved to History')}</span>
+            </div>
+          </div>
+        )}
         <div className="verdict-actions">
           <button className="btn sm ghost" onClick={() => speak(run)}>
             <Icon name="volume" /> {t('Read aloud')}

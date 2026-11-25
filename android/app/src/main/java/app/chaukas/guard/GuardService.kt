@@ -72,10 +72,20 @@ class GuardService : NotificationListenerService() {
         Guard.record(this, appName(sbn.packageName), kind, alert)
         if (alert != null) {
             Log.i(TAG, "warned: score=${alert.score}")
-            val isUnsaved = MessageGuard.isUnsavedSender(from) { Guard.isContactSaved(this, it) }
-            Guard.warn(this, alert, key.hashCode(), isKnownContact = !isUnsaved)
-            Guard.onAlertCallback?.invoke(alert, appName(sbn.packageName), !isUnsaved)
-            if (alert.score >= Guard.SCAM_AT && isUnsaved) {
+            val title = sbn.notification.extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
+            val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(sbn.notification)
+            val person = style?.messages?.lastOrNull { !it.text.isNullOrBlank() }?.person?.name?.toString().orEmpty()
+
+            val isKnown = Guard.isContactSaved(this, from) ||
+                (title.isNotBlank() && Guard.isContactSaved(this, title)) ||
+                (person.isNotBlank() && Guard.isContactSaved(this, person)) ||
+                !MessageGuard.isUnsavedSender(from) { Guard.isContactSaved(this, it) } ||
+                (title.isNotBlank() && !MessageGuard.isUnsavedSender(title) { Guard.isContactSaved(this, it) }) ||
+                (person.isNotBlank() && !MessageGuard.isUnsavedSender(person) { Guard.isContactSaved(this, it) })
+
+            Guard.warn(this, alert, key.hashCode(), isKnownContact = isKnown)
+            Guard.onAlertCallback?.invoke(alert, appName(sbn.packageName), isKnown)
+            if (alert.score >= Guard.SCAM_AT && !isKnown) {
                 Guard.onScamDetected(this, appName(sbn.packageName), kind, alert)
             }
         } else if (Guard.showSafe(this)) {
@@ -203,11 +213,18 @@ class GuardService : NotificationListenerService() {
     }
 
     private fun extractSender(n: Notification): String {
+        val extras = n.extras
+        val title = extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
         val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(n)
-        val person = style?.messages?.lastOrNull { !it.text.isNullOrBlank() }?.person?.name?.toString()
-        if (!person.isNullOrBlank()) return person
-        val extras = n.extras ?: return ""
-        return extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
+        val person = style?.messages?.lastOrNull { !it.text.isNullOrBlank() }?.person?.name?.toString().orEmpty()
+        val convTitle = style?.conversationTitle?.toString().orEmpty()
+
+        if (style?.isGroupConversation == true && person.isNotBlank()) {
+            return person
+        }
+        if (title.isNotBlank()) return title
+        if (person.isNotBlank()) return person
+        return convTitle
     }
 
     private companion object { const val TAG = "ChaukasGuard" }
@@ -569,44 +586,104 @@ object Guard {
      * if READ_CONTACTS permission has been granted. Checks both phone numbers and display names.
      */
     fun isContactSaved(ctx: Context, from: String): Boolean {
-        if (ctx.checkSelfPermission(android.Manifest.permission.READ_CONTACTS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            return false
-        }
         val clean = from.trim().removePrefix("~").trim()
         if (clean.isBlank()) return false
 
-        // Check by phone number if digits exist
+        // Check if READ_CONTACTS permission is granted
+        val hasPermission = ctx.checkSelfPermission(android.Manifest.permission.READ_CONTACTS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (!hasPermission) {
+            // When contacts permission is not granted:
+            // In WhatsApp notifications, ONLY saved contacts appear as plain display names (e.g. "Pooja", "Mom")
+            // without phone numbers or ~ prefixes.
+            val hasDigits = clean.any { it.isDigit() }
+            if (!hasDigits && !clean.startsWith("~") && !clean.contains("+") && clean.length in 2..40 &&
+                !clean.equals("unknown", ignoreCase = true) && !clean.equals("unknown sender", ignoreCase = true) &&
+                !Regex("""^[A-Za-z]{2}-[A-Za-z0-9]{3,8}$""").matches(clean)) {
+                return true
+            }
+            return false
+        }
+
+        // 1. Phone number lookups (both national and international formats)
         val digits = clean.filter { it.isDigit() }
         if (digits.length in 7..16) {
-            val phoneMatch = runCatching {
-                val uri = android.net.Uri.withAppendedPath(
-                    android.provider.ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
-                    android.net.Uri.encode(digits),
-                )
+            val last10 = if (digits.length >= 10) digits.takeLast(10) else digits
+
+            // A) Query ContactsContract.CommonDataKinds.Phone by SQL LIKE %last10%
+            val commonFound = runCatching {
                 ctx.contentResolver.query(
-                    uri,
-                    arrayOf(android.provider.ContactsContract.PhoneLookup.DISPLAY_NAME),
+                    android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                    arrayOf(android.provider.ContactsContract.CommonDataKinds.Phone._ID),
+                    "${android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER} LIKE ?",
+                    arrayOf("%$last10%"),
+                    null,
+                )?.use { it.moveToFirst() } ?: false
+            }.getOrDefault(false)
+            if (commonFound) return true
+
+            // B) Query PhoneLookup with multiple candidates
+            val candidates = listOf(clean, last10, "+91$last10", "0$last10", "+$digits", digits)
+            for (candidate in candidates) {
+                val matched = runCatching {
+                    val uri = android.net.Uri.withAppendedPath(
+                        android.provider.ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                        android.net.Uri.encode(candidate),
+                    )
+                    ctx.contentResolver.query(
+                        uri,
+                        arrayOf(android.provider.ContactsContract.PhoneLookup.DISPLAY_NAME),
+                        null,
+                        null,
+                        null,
+                    )?.use { it.moveToFirst() } ?: false
+                }.getOrDefault(false)
+                if (matched) return true
+            }
+
+            // C) Direct scan of phone numbers comparing trailing digits (handles arbitrary spacing/hyphens)
+            val cursorScanMatch = runCatching {
+                ctx.contentResolver.query(
+                    android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                    arrayOf(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER),
                     null,
                     null,
                     null,
                 )?.use { cursor ->
-                    cursor.moveToFirst()
+                    val numIdx = cursor.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER)
+                    while (cursor.moveToNext()) {
+                        val num = if (numIdx >= 0) cursor.getString(numIdx) else null
+                        if (num != null) {
+                            val d = num.filter { it.isDigit() }
+                            if (d.endsWith(last10) || (d.length >= 7 && last10.endsWith(d))) return@use true
+                        }
+                    }
+                    false
                 } ?: false
             }.getOrDefault(false)
-            if (phoneMatch) return true
+            if (cursorScanMatch) return true
         }
 
-        // Also check by contact name in ContactsContract.Contacts
-        return runCatching {
+        // 2. Contact display name lookup in ContactsContract.Contacts
+        val nameFound = runCatching {
             ctx.contentResolver.query(
                 android.provider.ContactsContract.Contacts.CONTENT_URI,
                 arrayOf(android.provider.ContactsContract.Contacts._ID),
                 "${android.provider.ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} = ? COLLATE NOCASE",
                 arrayOf(clean),
                 null,
-            )?.use { cursor ->
-                cursor.moveToFirst()
-            } ?: false
+            )?.use { it.moveToFirst() } ?: false
+        }.getOrDefault(false)
+        if (nameFound) return true
+
+        // 3. Fallback: partial match on display name
+        return runCatching {
+            ctx.contentResolver.query(
+                android.provider.ContactsContract.Contacts.CONTENT_URI,
+                arrayOf(android.provider.ContactsContract.Contacts._ID),
+                "${android.provider.ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} LIKE ?",
+                arrayOf("%$clean%"),
+                null,
+            )?.use { it.moveToFirst() } ?: false
         }.getOrDefault(false)
     }
 

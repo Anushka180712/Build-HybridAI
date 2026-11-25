@@ -92,15 +92,26 @@ object MessageGuard {
         if (trimmed.isEmpty()) return true
 
         // 1. WhatsApp prefix ~ denotes an unsaved push name (e.g. "~Anushka")
-        if (trimmed.startsWith("~")) return true
+        // But if ~Name stripped matches a saved contact in phonebook, it is recognized as saved.
+        if (trimmed.startsWith("~")) {
+            val withoutTilde = trimmed.removePrefix("~").trim()
+            if (isContactSavedLookup != null && withoutTilde.isNotBlank()) {
+                val saved = runCatching { isContactSavedLookup(withoutTilde) }.getOrDefault(false)
+                if (saved) return false
+            }
+            return true
+        }
 
         // 2. Embedded phone numbers in parentheses or string (e.g. "Anushka (+91 98765 43210)")
         val phonePattern = Regex("""(\+?\d[\d -]{7,15}\d)""").find(trimmed)
         if (phonePattern != null) {
             val phoneDigits = phonePattern.value.filter { it.isDigit() }
             if (phoneDigits.length in 7..16) {
-                if (isContactSavedLookup != null && runCatching { isContactSavedLookup(phoneDigits) }.getOrDefault(false)) {
-                    return false
+                if (isContactSavedLookup != null) {
+                    val saved = runCatching { isContactSavedLookup(trimmed) }.getOrDefault(false) ||
+                                runCatching { isContactSavedLookup(phoneDigits) }.getOrDefault(false) ||
+                                (phoneDigits.length >= 10 && runCatching { isContactSavedLookup(phoneDigits.takeLast(10)) }.getOrDefault(false))
+                    if (saved) return false
                 }
                 return true
             }
@@ -132,9 +143,18 @@ object MessageGuard {
         val letters = trimmed.filter { it.isLetter() }
 
         // 7. Phone numbers: starts with + or has 7-16 digits with minimal/no alphabetic letters
-        if (trimmed.startsWith("+") && digits.length in 7..16) return true
-        if (digits.length in 7..16 && letters.isEmpty()) return true
-        if (digits.length in 7..16 && letters.length <= 1) return true
+        val isNumericPattern = (trimmed.startsWith("+") && digits.length in 7..16) ||
+                (digits.length in 7..16 && letters.isEmpty()) ||
+                (digits.length in 7..16 && letters.length <= 1)
+        if (isNumericPattern) {
+            if (isContactSavedLookup != null) {
+                val saved = runCatching { isContactSavedLookup(trimmed) }.getOrDefault(false) ||
+                            runCatching { isContactSavedLookup(digits) }.getOrDefault(false) ||
+                            (digits.length >= 10 && runCatching { isContactSavedLookup(digits.takeLast(10)) }.getOrDefault(false))
+                if (saved) return false
+            }
+            return true
+        }
 
         // Otherwise it is considered a saved contact name (e.g. "Mom", "Sunita Sharma", "Rohan")
         return false

@@ -147,7 +147,13 @@ export function CheckView() {
         toast(t('Read on this phone. Only the words were checked, with personal details removed.'));
       }
       setRun(r);
-      setSavedToHistory(false);
+      if (!isKnownContact && r.analysis.verdict !== 'safe' && r.analysis.riskScore >= 65) {
+        saveRun(r);
+        setSavedToHistory(true);
+        autoShareToCircles(r).then((names) => names.length && toast(`${t('Auto-shared to Family Circle & saved to History')}`), () => undefined);
+      } else {
+        setSavedToHistory(false);
+      }
       if (isKnownContact && r.analysis.verdict !== 'safe' && r.analysis.riskScore >= 65) {
         const flags = r.analysis.redFlags.map((f) => f.label).join(' · ');
         toast(`${t('Red flags detected from contact:')} ${flags}. ${t('Kept private to protect your contact.')}`, 'alert');
@@ -526,6 +532,8 @@ export function CheckView() {
           onChange={setRun}
           savedToHistory={savedToHistory}
           onSaveToHistory={handleSaveToHistory}
+          isKnownContact={isKnownContact}
+          onDismiss={() => { setRun(null); setText(''); setImage(null); }}
         />
       )}
 

@@ -290,15 +290,20 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
         }.getOrNull()
     }
 
-    fun check(isKnown: Boolean = false, fromSender: String = "") {
+    fun check(isKnown: Boolean? = null, fromSender: String = "") {
         if (text.isBlank() && attachedImageUri == null && attachedBitmap == null) return
         if (busy) return
         busy = true
         error = null
         run = null
         stage = 0
-        isKnownContact = isKnown
-        senderName = fromSender
+        if (isKnown != null) {
+            isKnownContact = isKnown
+        }
+        if (fromSender.isNotBlank()) {
+            senderName = fromSender
+        }
+        val effectiveIsKnown = isKnown ?: isKnownContact
         isSavedToHistory = false
 
         // Stage progress animation
@@ -311,14 +316,14 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
 
         viewModelScope.launch {
             try {
-                val existing = if (!isKnown) history.runs.firstOrNull { it.input.trim() == text.trim() } else null
+                val existing = if (!effectiveIsKnown) history.runs.firstOrNull { it.input.trim() == text.trim() } else null
                 if (existing != null) {
                     run = existing
                     isSavedToHistory = true
                 } else {
                     val r = engine.analyze(text, mode, redact, emptyList(), language)
                     run = r
-                    if (!isKnown && r.analysis.verdict != Verdict.SAFE && r.analysis.riskScore >= 65) {
+                    if (!effectiveIsKnown && r.analysis.verdict != Verdict.SAFE && r.analysis.riskScore >= 65) {
                         saveCurrentRunToHistory()
                     } else {
                         isSavedToHistory = false
