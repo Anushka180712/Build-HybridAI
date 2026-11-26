@@ -239,7 +239,7 @@ fun ChaukasRoot(vm: ChaukasViewModel) {
                                 Spacer(Modifier.height(10.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 ) {
                                     // Mark as scam button
                                     Button(
@@ -257,14 +257,17 @@ fun ChaukasRoot(vm: ChaukasViewModel) {
                                             contentColor = Color.White,
                                         ),
                                         shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.weight(1f).height(38.dp),
+                                        modifier = Modifier.weight(1.3f).height(38.dp),
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                                     ) {
-                                        Icon(Icons.Outlined.Warning, null, modifier = Modifier.size(15.dp))
-                                        Spacer(Modifier.width(6.dp))
+                                        Icon(Icons.Outlined.Warning, null, modifier = Modifier.size(13.dp))
+                                        Spacer(Modifier.width(4.dp))
                                         Text(
                                             text = I18n.t("Mark as scam", vm.language),
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp,
+                                            fontSize = 11.sp,
+                                            maxLines = 1,
+                                            softWrap = false,
                                         )
                                     }
 
@@ -283,15 +286,18 @@ fun ChaukasRoot(vm: ChaukasViewModel) {
                                         ),
                                         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)),
                                         shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.weight(1f).height(38.dp),
+                                        modifier = Modifier.weight(0.9f).height(38.dp),
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                                     ) {
-                                        Icon(Icons.Outlined.CheckCircle, null, modifier = Modifier.size(15.dp), tint = Color(0xFF81C784))
-                                        Spacer(Modifier.width(6.dp))
+                                        Icon(Icons.Outlined.CheckCircle, null, modifier = Modifier.size(13.dp), tint = Color(0xFF81C784))
+                                        Spacer(Modifier.width(4.dp))
                                         Text(
                                             text = I18n.t("It's okay", vm.language),
                                             fontWeight = FontWeight.SemiBold,
-                                            fontSize = 12.sp,
+                                            fontSize = 11.sp,
                                             color = Color.White,
+                                            maxLines = 1,
+                                            softWrap = false,
                                         )
                                     }
                                 }
@@ -1315,7 +1321,7 @@ private fun ResultView(
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Button(
                                 onClick = {
@@ -1332,14 +1338,17 @@ private fun ResultView(
                                     contentColor = Color.White,
                                 ),
                                 shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f).height(44.dp),
+                                modifier = Modifier.weight(1.3f).height(42.dp),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                             ) {
-                                Icon(Icons.Outlined.Warning, null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
+                                Icon(Icons.Outlined.Warning, null, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
                                 Text(
                                     text = if (vm.isSavedToHistory) I18n.t("Shared to circle & history", vm.language) else I18n.t("Mark as scam", vm.language),
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp,
+                                    fontSize = 11.5.sp,
+                                    maxLines = 1,
+                                    softWrap = false,
                                 )
                             }
 
@@ -1353,16 +1362,19 @@ private fun ResultView(
                                     ).show()
                                 },
                                 shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f).height(44.dp),
+                                modifier = Modifier.weight(0.9f).height(42.dp),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                                 border = BorderStroke(1.dp, Color(0xFFD0D5DD)),
                             ) {
-                                Icon(Icons.Outlined.CheckCircle, null, modifier = Modifier.size(16.dp), tint = Color(0xFF2E7D32))
-                                Spacer(Modifier.width(6.dp))
+                                Icon(Icons.Outlined.CheckCircle, null, modifier = Modifier.size(14.dp), tint = Color(0xFF2E7D32))
+                                Spacer(Modifier.width(4.dp))
                                 Text(
                                     text = I18n.t("It's okay", vm.language),
                                     fontWeight = FontWeight.SemiBold,
-                                    fontSize = 13.sp,
+                                    fontSize = 11.5.sp,
                                     color = Chaukas.Ink2,
+                                    maxLines = 1,
+                                    softWrap = false,
                                 )
                             }
                         }
@@ -1545,7 +1557,10 @@ private fun ResultView(
             AlertDialog(
                 onDismissRequest = { expandedFlag = null },
                 confirmButton = {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
                         if (vm.isKnownContact) {
                             Button(
                                 onClick = {
@@ -1559,10 +1574,16 @@ private fun ResultView(
                                 },
                                 enabled = !vm.isSavedToHistory,
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1.3f).height(40.dp),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                             ) {
                                 Text(
-                                    if (vm.isSavedToHistory) I18n.t("Shared to circle & history", vm.language) else I18n.t("Mark as scam", vm.language),
+                                    text = if (vm.isSavedToHistory) I18n.t("Shared to circle & history", vm.language) else I18n.t("Mark as scam", vm.language),
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false,
                                 )
                             }
                             OutlinedButton(
@@ -1575,9 +1596,16 @@ private fun ResultView(
                                         Toast.LENGTH_SHORT,
                                     ).show()
                                 },
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(0.9f).height(40.dp),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                             ) {
-                                Text(I18n.t("It's okay", vm.language))
+                                Text(
+                                    text = I18n.t("It's okay", vm.language),
+                                    fontSize = 11.5.sp,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
                             }
                         } else if (!vm.isSavedToHistory) {
                             Button(

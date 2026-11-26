@@ -143,7 +143,7 @@ export function Result({
               <button
                 type="button"
                 className="btn sm"
-                style={{ background: '#C62828', color: '#FFF' }}
+                style={{ background: '#C62828', color: '#FFF', whiteSpace: 'nowrap', fontSize: 12, padding: '6px 12px', flexShrink: 0 }}
                 onClick={() => {
                   onSaveToHistory?.(run);
                   toast(t('Shared as scam to circle & history'), 'check');
@@ -155,6 +155,7 @@ export function Result({
               <button
                 type="button"
                 className="btn sm ghost"
+                style={{ whiteSpace: 'nowrap', fontSize: 12, padding: '6px 12px', flexShrink: 0 }}
                 onClick={() => {
                   onDismiss?.();
                   toast(t("Dismissed"), 'x');
