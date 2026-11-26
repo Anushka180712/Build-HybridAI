@@ -9,7 +9,6 @@ import { computeSignals } from '../ai/signals';
 import { engineSettings, languageCode, settingsStore } from '../data/settings';
 import { SPEECH_LOCALES } from '../lib/voice';
 import { VERDICT_WORDS, spokenVerdict, uiLang } from '../lib/verdictWords';
-import { guessRegion } from '../lib/report';
 import { renderWarningCard, shareWarningCard } from '../lib/warningCard';
 import { saveRun } from '../data/history';
 import { rcStore } from '../lib/appState';
@@ -194,7 +193,7 @@ export function Result({
               <Icon name="phone" /> {t('Call my family')}
             </a>
           )}
-          {a.verdict === 'scam' && guessRegion() === 'IN' && (
+          {a.verdict === 'scam' && (
             <a className="btn sm ghost" href="tel:1930" title="National Cyber Crime Helpline, if you already paid or shared a code">
               <Icon name="phone" /> {t('Call 1930')}
             </a>
