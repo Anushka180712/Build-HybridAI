@@ -33,8 +33,14 @@ export function CircleView({ param }: { param?: string }) {
   const t = useT();
   const { user, ready } = useUser();
   const [circles, setCircles] = useState<Circle[]>([]);
-  const [active, setActive] = useState<string>('');
+  const [active, setActive] = useState<string>(() => (typeof localStorage !== 'undefined' ? localStorage.getItem('chaukas_active_circle') || '' : ''));
   const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (active && typeof localStorage !== 'undefined') {
+      localStorage.setItem('chaukas_active_circle', active);
+    }
+  }, [active]);
   const inviteCode = codeFromParam(param);
   const personHandle = handleFromParam(param);
   const joining = useRef('');

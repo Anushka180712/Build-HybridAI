@@ -55,7 +55,14 @@ export function ShareToCircle({ run, onClose }: { run: AnalysisRun; onClose: () 
               <label>Send to</label>
               <div className="row wrap">
                 {circles.map((c) => (
-                  <button key={c.id} className={`chip ${pick === c.id ? 'on' : ''}`} onClick={() => setPick(c.id)}>
+                  <button
+                    key={c.id}
+                    className={`chip ${pick === c.id ? 'on' : ''}`}
+                    onClick={() => {
+                      setPick(c.id);
+                      if (typeof localStorage !== 'undefined') localStorage.setItem('chaukas_active_circle', c.id);
+                    }}
+                  >
                     <Icon name="users" /> {c.name}
                   </button>
                 ))}

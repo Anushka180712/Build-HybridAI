@@ -588,20 +588,27 @@ object Repository {
         ).await()
     }
 
+    fun getActiveCircleId(ctx: Context): String? =
+        ctx.getSharedPreferences("chaukas.settings", Context.MODE_PRIVATE).getString("activeCircleId", null)
+
+    fun setActiveCircleId(ctx: Context, id: String) {
+        ctx.getSharedPreferences("chaukas.settings", Context.MODE_PRIVATE).edit().putString("activeCircleId", id).apply()
+    }
+
     suspend fun autoShareToCircles(run: AnalysisRun, context: Context? = null): List<String> {
         val user = runCatching { ensureAuth(context) }.getOrNull()
         val u = user?.uid ?: uid ?: return emptyList()
         if (run.analysis.verdict == Verdict.SAFE || run.analysis.riskScore < SHARE_MIN_RISK) return emptyList()
         val snap = db.collection("circles").whereArrayContains("members", u).get().await()
-        val sharedNames = mutableListOf<String>()
-        for (doc in snap.documents) {
-            val name = doc.getString("name") ?: "Family"
-            runCatching {
-                shareAlert(doc.id, run, "")
-                sharedNames.add(name)
-            }
+        if (snap.isEmpty) return emptyList()
+        // Target only the selected / active circle (or first circle if none explicitly set)
+        val activeId = context?.let { getActiveCircleId(it) }
+        val targetDoc = snap.documents.firstOrNull { it.id == activeId } ?: snap.documents.first()
+        val name = targetDoc.getString("name") ?: "Family"
+        runCatching {
+            shareAlert(targetDoc.id, run, "")
         }
-        return sharedNames
+        return listOf(name)
     }
 
     /* ---------------- Remote Config ---------------- */

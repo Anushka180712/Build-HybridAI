@@ -59,8 +59,9 @@ class GuardService : NotificationListenerService() {
     private fun check(sbn: StatusBarNotification) {
         if (!Guard.isOn(this) || sbn.packageName == packageName) return
         val n = sbn.notification
+        // Drop group summary container notifications unconditionally to prevent duplicate checks
+        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
         val text = extractMessageText(n) ?: return
-        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0 && MessageGuard.isSummary(text)) return
         val from = extractSender(n)
         val watched = setOfNotNull(Telephony.Sms.getDefaultSmsPackage(this))
         val kind = MessageGuard.kind(sbn.packageName, watched) ?: return
@@ -88,7 +89,8 @@ class GuardService : NotificationListenerService() {
 
             val isKnown = Guard.isSenderKnown(this, from, title, person)
 
-            val notificationId = Math.abs((sbn.packageName + from + text).hashCode()) % 100000 + 1000
+            // Stable notification ID based on app package and text excerpt so updates replace in-place without duplicating
+            val notificationId = Math.abs((sbn.packageName + text.trim().take(40)).hashCode()) % 100000 + 1000
             Guard.warn(this, alert, notificationId, isKnownContact = isKnown)
             Guard.onAlertCallback?.invoke(alert, appName(sbn.packageName), isKnown)
             if (alert.score >= Guard.SCAM_AT && !isKnown) {
@@ -562,7 +564,7 @@ object Guard {
             from = from,
         )
         record(ctx, app, kind, alert)
-        val notificationId = (System.currentTimeMillis() % 10000).toInt() + 100
+        val notificationId = 1947
         warn(ctx, alert, notificationId, isKnownContact = isKnown)
         onAlertCallback?.invoke(alert, app, isKnown)
         if (alert.score >= SCAM_AT && !isKnown) {
@@ -587,14 +589,14 @@ object Guard {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val pending = PendingIntent.getActivity(ctx, id, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val title = if (isKnownContact) {
-            "⚠️ Red flags in message from ${alert.from}"
+            "⚠️ Scam alert: Message from ${alert.from}"
         } else if (alert.score >= 60) {
             "⚠️ Scam alert: This message looks like fraud"
         } else {
             "⚠️ Warning: Suspicious message"
         }
         val body = if (isKnownContact) {
-            "Why it's flagged: ${alert.reasons.joinToString(" · ")}. Their phone or account may be compromised. Tap to inspect, or dismiss if safe."
+            "Scam signals detected: ${alert.reasons.joinToString(" · ")}. Tap to review in Chaukas."
         } else {
             val who = if (alert.from.isNotBlank()) "From ${alert.from}. " else ""
             "$who${alert.reasons.joinToString(" · ")}. Don't tap links or share codes. Tap for a full check."
@@ -611,37 +613,9 @@ object Guard {
             .setContentIntent(pending)
             .setAutoCancel(true)
 
-        if (isKnownContact) {
-            // Action 1: Tap to open and share as scam
-            val shareIntent = Intent(ctx, MainActivity::class.java).apply {
-                action = ACTION_CHECK
-                putExtra(Intent.EXTRA_TEXT, alert.text)
-                putExtra(EXTRA_IS_KNOWN, true)
-                putExtra(EXTRA_FROM, alert.from)
-                putExtra(EXTRA_SCORE, alert.score)
-                putExtra("auto_share", true)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            }
-            val sharePending = PendingIntent.getActivity(
-                ctx,
-                id + 1,
-                shareIntent,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-            )
-            builder.addAction(0, "Mark as scam", sharePending)
-
-            // Action 2: Quick dismiss "It's okay"
-            val dismissIntent = Intent(ctx, GuardActionReceiver::class.java).apply {
-                putExtra("notification_id", id)
-            }
-            val dismissPending = PendingIntent.getBroadcast(
-                ctx,
-                id + 2,
-                dismissIntent,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-            )
-            builder.addAction(0, "It's okay", dismissPending)
-        } else {
+        // For known contacts, no confusing inline actions on the notification shade:
+        // clicking the notification redirects directly into the app with the complete message and decision buttons.
+        if (!isKnownContact) {
             // Unknown sender: quick dismiss action
             val dismissIntent = Intent(ctx, GuardActionReceiver::class.java).apply {
                 putExtra("notification_id", id)
