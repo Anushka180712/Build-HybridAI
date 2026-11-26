@@ -25,6 +25,9 @@ object Signals {
         Rule("digital_arrest", "\"Digital arrest\" or police threat", 26, r("""\b(digital arrest|cbi|narcotics|customs (department|officer)|trai|your (number|sim) will be (blocked|disconnected)|money laundering)\b""")),
         Rule("power_cut", "Power cut threat", 26, r("""(?:\b(electricity|power|light|bijli|current|bill)\b.{0,80}\b(disconnect(ed|ion)?|cut|suspended|off|unpaid|pending|baki|officer|9\.\d{2} ?(pm|am))\b|\b(disconnect(ed|ion)?|cut|suspended|off|unpaid|pending|baki)\b.{0,80}\b(electricity|power|light|bijli|current|bill)\b)""")),
         Rule("call_officer", "Contact officer / mobile number", 22, r("""\b(contact|call|officer|dial|sampark (kare|kariye|karo)|helpline|whatsapp).{0,50}(\+?91|0)?[6-9]\d{9}\b""")),
+        Rule("scam_keyword", "Scam or fraud keyword", 38, r("""\b(scam(s|mer|ming)?|fraud(ulent)?|phishing|fake|fraudster|cheat(ing)?)\b""")),
+        Rule("recharge", "Free recharge or data offer", 38, r("""\b(free (recharge|data|internet|5g|offer)|recharge (offer|approved|free)|5g (free|offer|recharge)|free (jio|airtel|vi))\b""")),
+        Rule("traffic_challan", "Traffic fine / e-challan notice", 38, r("""\b(e-?challan|traffic (fine|police|challan)|pay fine|parivahan|pending challan)\b""")),
     )
 
     private val shorteners = setOf("bit.ly", "tinyurl.com", "t.co", "goo.gl", "is.gd", "cutt.ly", "rb.gy", "t.ly")

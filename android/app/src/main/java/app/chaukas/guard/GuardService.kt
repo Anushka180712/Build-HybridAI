@@ -49,6 +49,7 @@ class GuardService : NotificationListenerService() {
         }
         // One bad notification must never stop the checker.
         try {
+            Log.d(TAG, "onNotificationPosted: pkg=${sbn.packageName} id=${sbn.id}")
             check(sbn)
         } catch (e: Exception) {
             Log.e(TAG, "could not check a notification", e)
@@ -490,9 +491,28 @@ object Guard {
         return true
     }
 
+    /** Asks the system to reconnect the checker, using component toggle to fix Android dead-binder bug. */
+    fun forceRebind(ctx: Context) {
+        if (!hasAccess(ctx)) {
+            Log.w("ChaukasGuard", "forceRebind: Notification access not granted yet")
+            return
+        }
+        val cn = ComponentName(ctx, GuardService::class.java)
+        val pm = ctx.packageManager
+        try {
+            pm.setComponentEnabledSetting(cn, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, android.content.pm.PackageManager.DONT_KILL_APP)
+            pm.setComponentEnabledSetting(cn, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, android.content.pm.PackageManager.DONT_KILL_APP)
+            NotificationListenerService.requestRebind(cn)
+            Log.i("ChaukasGuard", "forceRebind: Successfully toggled component and requested rebind")
+        } catch (e: Exception) {
+            Log.w("ChaukasGuard", "forceRebind: Fallback requestRebind", e)
+            runCatching { NotificationListenerService.requestRebind(cn) }
+        }
+    }
+
     /** Asks the system to reconnect the checker, for phones that stopped it. */
     fun reconnect(ctx: Context) {
-        NotificationListenerService.requestRebind(ComponentName(ctx, GuardService::class.java))
+        forceRebind(ctx)
     }
 
     /** Opens the place to grant notification access, on any phone (some lack the detail page). */

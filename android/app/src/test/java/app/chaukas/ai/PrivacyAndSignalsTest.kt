@@ -51,6 +51,20 @@ class SignalsTest {
         val ids = Signals.compute("Your KYC is expired, account blocked. Enter your UPI PIN. upi://pay?pa=a@ybl").first.map { it.id }
         assertTrue(ids.containsAll(listOf("india_kyc", "upi_pin", "upi_qr")))
     }
+
+    @Test fun catchesScamKeywordsAndRechargeAndChallan() {
+        val (scamSignals, scamScore) = Signals.compute("This is a scam message from unknown")
+        assertTrue(scamSignals.any { it.id == "scam_keyword" })
+        assertTrue(scamScore >= 65)
+
+        val (rechargeSignals, rechargeScore) = Signals.compute("Free 5G recharge offer click here")
+        assertTrue(rechargeSignals.any { it.id == "recharge" })
+        assertTrue(rechargeScore >= 65)
+
+        val (challanSignals, challanScore) = Signals.compute("Pending e-challan traffic fine parivahan")
+        assertTrue(challanSignals.any { it.id == "traffic_challan" })
+        assertTrue(challanScore >= 65)
+    }
 }
 
 class AnalysisParserTest {

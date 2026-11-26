@@ -60,6 +60,7 @@ class MainActivity : ComponentActivity() {
         }
         if (Guard.isOn(this) && Guard.hasAccess(this)) {
             Guard.start(this)
+            Guard.forceRebind(this)
         }
         setContent { ChaukasTheme { ChaukasRoot(vm) } }
     }
@@ -69,9 +70,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         if (Guard.isOn(this) && Guard.hasAccess(this)) {
             Guard.start(this)
-            android.service.notification.NotificationListenerService.requestRebind(
-                android.content.ComponentName(this, GuardService::class.java),
-            )
+            Guard.forceRebind(this)
         }
     }
 

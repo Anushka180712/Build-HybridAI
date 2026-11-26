@@ -158,6 +158,27 @@ PHRASES.push(
     weight: 22,
     re: /\b(contact|call|officer|dial|sampark (kare|kariye|karo)|helpline).{0,30}(\+?91|0)?[6-9]\d{9}\b/gi,
   },
+  {
+    id: 'scam_keyword',
+    label: 'Scam or fraud keyword',
+    detail: 'Direct reference to scams, fraud, phishing or fake schemes.',
+    weight: 38,
+    re: /\b(scam(s|mer|ming)?|fraud(ulent)?|phishing|fake|fraudster|cheat(ing)?)\b/gi,
+  },
+  {
+    id: 'recharge',
+    label: 'Free recharge or data offer',
+    detail: 'Promises of free mobile recharges or data are classic phishing hooks.',
+    weight: 36,
+    re: /\b(free (recharge|data|internet|5g|offer)|recharge (offer|approved|free)|5g (free|offer|recharge)|free (jio|airtel|vi))\b/gi,
+  },
+  {
+    id: 'traffic_challan',
+    label: 'Traffic fine or e-challan notice',
+    detail: 'Fake e-challan notices pressure you to pay bogus traffic fines.',
+    weight: 36,
+    re: /\b(e-?challan|traffic (fine|police|challan)|pay fine|parivahan|pending challan)\b/gi,
+  },
 );
 
 const SHORTENERS = ['bit.ly', 'tinyurl.com', 't.co', 'goo.gl', 'ow.ly', 'is.gd', 'buff.ly', 'rebrand.ly', 'cutt.ly', 'shorturl.at', 'rb.gy', 't.ly', 's.id'];

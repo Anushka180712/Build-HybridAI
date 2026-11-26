@@ -31,6 +31,20 @@ describe('India patterns', () => {
     expect(u.signals.some((s) => s.id === 'upi_pin')).toBe(true);
     expect(u.score).toBeGreaterThan(30);
   });
+
+  it('flags scam keywords, free recharge, and e-challan', () => {
+    const s = computeSignals('This is a scam message from unknown');
+    expect(s.signals.some((sig) => sig.id === 'scam_keyword')).toBe(true);
+    expect(s.score).toBeGreaterThanOrEqual(50);
+
+    const r = computeSignals('Free 5G recharge offer for all users');
+    expect(r.signals.some((sig) => sig.id === 'recharge')).toBe(true);
+    expect(r.score).toBeGreaterThanOrEqual(50);
+
+    const c = computeSignals('Pending e-challan traffic fine pay immediately');
+    expect(c.signals.some((sig) => sig.id === 'traffic_challan')).toBe(true);
+    expect(c.score).toBeGreaterThanOrEqual(50);
+  });
 });
 
 describe('QR inspector', () => {

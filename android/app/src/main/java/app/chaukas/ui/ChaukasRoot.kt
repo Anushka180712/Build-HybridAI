@@ -3247,6 +3247,7 @@ private fun AutoScanToggleBar(language: String = "English") {
         hasSmsPermission = ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
         if (on && access) {
             Guard.start(ctx)
+            Guard.forceRebind(ctx)
         }
         onPauseOrDispose { }
     }
@@ -3290,33 +3291,36 @@ private fun AutoScanToggleBar(language: String = "English") {
         }
     }
 
+    var showTestMenu by remember { mutableStateOf(false) }
+
     val active = on && access && (watchSms || watchChat)
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         color = if (active) Color(0xFFF0FAF4) else Color(0xFFF9FAFB),
         border = BorderStroke(1.dp, if (active) Color(0xFFC7EBD7) else Color(0xFFE5E7EB)),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 11.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = 10.dp, vertical = 7.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            // Header: Shield Icon + Title + Status + Switch
+            // Sleek single row: Shield Icon + Auto-Scan + SMS & WhatsApp Chips + Test Menu + Switch
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
+                // Left side: Shield + Auto-Scan + Target App Chips
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f),
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(28.dp)
+                            .size(22.dp)
                             .clip(CircleShape)
                             .background(if (active) Color(0xFFDCFCE7) else Color(0xFFE5E7EB)),
                         contentAlignment = Alignment.Center,
@@ -3325,80 +3329,19 @@ private fun AutoScanToggleBar(language: String = "English") {
                             Icons.Outlined.Shield,
                             contentDescription = null,
                             tint = if (active) Color(0xFF15803D) else Chaukas.Ink2,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(13.dp),
                         )
                     }
-                    Spacer(Modifier.width(9.dp))
-                    Column {
-                        Text(
-                            text = I18n.t("Warns you of scams on this phone", language),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (active) Color(0xFF1E6140) else Chaukas.Ink,
-                        )
-                        Text(
-                            text = if (active) {
-                                when {
-                                    watchSms && watchChat -> I18n.t("Active · Both", language)
-                                    watchChat -> I18n.t("Active · WhatsApp", language)
-                                    watchSms -> I18n.t("Active · SMS", language)
-                                    else -> I18n.t("None selected", language)
-                                }
-                            } else if (on && !access) {
-                                I18n.t("Fix permission", language)
-                            } else {
-                                I18n.t("Turned off", language)
-                            },
-                            fontSize = 11.sp,
-                            color = if (active) Color(0xFF2C7D54) else if (on && !access) Color(0xFFB42318) else Chaukas.Ink3,
-                        )
-                    }
-                }
-                Switch(
-                    checked = active,
-                    onCheckedChange = { want ->
-                        if (want) {
-                            if (!watchSms && !watchChat) {
-                                watchSms = true
-                                watchChat = true
-                                Guard.setWatches(ctx, "sms", true)
-                                Guard.setWatches(ctx, "chat", true)
-                            }
-                            explain = true
-                        } else {
-                            on = false
-                            Guard.setOn(ctx, false)
-                            Guard.stop(ctx)
-                        }
-                    },
-                    modifier = Modifier.scale(0.8f),
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = Chaukas.Mint600,
-                        uncheckedThumbColor = Color.White,
-                        uncheckedTrackColor = Color(0xFFD1D5DB),
-                    ),
-                )
-            }
-
-            // Target Apps and Status Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
+                    Spacer(Modifier.width(6.dp))
                     Text(
-                        text = I18n.t("Scan:", language),
-                        fontSize = 11.sp,
-                        color = if (active) Color(0xFF2C7D54) else Chaukas.Ink3,
-                        fontWeight = FontWeight.Medium,
+                        text = I18n.t("Auto-Scan", language),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (active) Color(0xFF1E6140) else Chaukas.Ink,
                     )
+                    Spacer(Modifier.width(7.dp))
 
-                    // SMS option chip
+                    // SMS option pill
                     Surface(
                         onClick = {
                             val next = !watchSms
@@ -3410,6 +3353,7 @@ private fun AutoScanToggleBar(language: String = "English") {
                                     Guard.setOn(ctx, true)
                                 }
                                 Guard.start(ctx)
+                                Guard.forceRebind(ctx)
                                 if (!access) explain = true
                             } else if (!watchChat) {
                                 on = false
@@ -3417,31 +3361,29 @@ private fun AutoScanToggleBar(language: String = "English") {
                                 Guard.stop(ctx)
                             }
                         },
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (watchSms && on) (if (access) Chaukas.Mint600 else Color(0xFF475467)) else Color.White,
-                        border = BorderStroke(
-                            1.dp,
-                            if (watchSms && on) (if (access) Chaukas.Mint600 else Color(0xFF475467)) else Color(0xFFD0D5DD),
-                        ),
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (watchSms && on) (if (access) Chaukas.Mint600 else Color(0xFF475467)) else Color(0xFFE5E7EB),
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             if (watchSms && on) {
-                                Icon(Icons.Outlined.Check, null, tint = Color.White, modifier = Modifier.size(11.dp))
-                                Spacer(Modifier.width(3.dp))
+                                Icon(Icons.Outlined.Check, null, tint = Color.White, modifier = Modifier.size(9.dp))
+                                Spacer(Modifier.width(2.dp))
                             }
                             Text(
                                 text = "SMS",
-                                fontSize = 11.sp,
+                                fontSize = 10.sp,
                                 fontWeight = if (watchSms && on) FontWeight.Bold else FontWeight.Medium,
                                 color = if (watchSms && on) Color.White else Chaukas.Ink2,
                             )
                         }
                     }
 
-                    // WhatsApp option chip
+                    Spacer(Modifier.width(4.dp))
+
+                    // WhatsApp option pill
                     Surface(
                         onClick = {
                             val next = !watchChat
@@ -3453,6 +3395,7 @@ private fun AutoScanToggleBar(language: String = "English") {
                                     Guard.setOn(ctx, true)
                                 }
                                 Guard.start(ctx)
+                                Guard.forceRebind(ctx)
                                 if (!access) explain = true
                             } else if (!watchSms) {
                                 on = false
@@ -3460,24 +3403,20 @@ private fun AutoScanToggleBar(language: String = "English") {
                                 Guard.stop(ctx)
                             }
                         },
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (watchChat && on) (if (access) Chaukas.Mint600 else Color(0xFF475467)) else Color.White,
-                        border = BorderStroke(
-                            1.dp,
-                            if (watchChat && on) (if (access) Chaukas.Mint600 else Color(0xFF475467)) else Color(0xFFD0D5DD),
-                        ),
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (watchChat && on) (if (access) Chaukas.Mint600 else Color(0xFF475467)) else Color(0xFFE5E7EB),
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             if (watchChat && on) {
-                                Icon(Icons.Outlined.Check, null, tint = Color.White, modifier = Modifier.size(11.dp))
-                                Spacer(Modifier.width(3.dp))
+                                Icon(Icons.Outlined.Check, null, tint = Color.White, modifier = Modifier.size(9.dp))
+                                Spacer(Modifier.width(2.dp))
                             }
                             Text(
                                 text = "WhatsApp",
-                                fontSize = 11.sp,
+                                fontSize = 10.sp,
                                 fontWeight = if (watchChat && on) FontWeight.Bold else FontWeight.Medium,
                                 color = if (watchChat && on) Color.White else Chaukas.Ink2,
                             )
@@ -3485,401 +3424,215 @@ private fun AutoScanToggleBar(language: String = "English") {
                     }
                 }
 
-                if (on && !access) {
-                    Surface(
-                        onClick = { Guard.openAccess(ctx) },
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFFFEF3F2),
-                        border = BorderStroke(1.dp, Color(0xFFFECDCA)),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                // Right side: Compact Test pill with dropdown menu + Switch
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Box {
+                        Surface(
+                            onClick = { showTestMenu = true },
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (active) Color(0xFFDCFCE7) else Color(0xFFF3F4F6),
+                            border = BorderStroke(1.dp, if (active) Color(0xFF86EFAC) else Color(0xFFD1D5DB)),
                         ) {
-                            Icon(Icons.Outlined.Warning, null, tint = Color(0xFFB42318), modifier = Modifier.size(12.dp))
-                            Spacer(Modifier.width(3.dp))
-                            Text(
-                                text = I18n.t("Fix permission", language),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFFB42318),
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    Icons.Outlined.PlayArrow,
+                                    contentDescription = null,
+                                    tint = if (active) Color(0xFF15803D) else Chaukas.Ink2,
+                                    modifier = Modifier.size(11.dp),
+                                )
+                                Spacer(Modifier.width(2.dp))
+                                Text(
+                                    text = I18n.t("Test", language),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (active) Color(0xFF15803D) else Chaukas.Ink2,
+                                )
+                            }
+                        }
+
+                        DropdownMenu(
+                            expanded = showTestMenu,
+                            onDismissRequest = { showTestMenu = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("WhatsApp Scam (Unknown Sender)", fontSize = 12.sp) },
+                                onClick = {
+                                    showTestMenu = false
+                                    onRunTest("chat")
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Outlined.Chat,
+                                        contentDescription = null,
+                                        tint = Color(0xFF15803D),
+                                        modifier = Modifier.size(15.dp),
+                                    )
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("SMS Scam (Unknown Sender)", fontSize = 12.sp) },
+                                onClick = {
+                                    showTestMenu = false
+                                    onRunTest("sms")
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Outlined.Sms,
+                                        contentDescription = null,
+                                        tint = Color(0xFF1E40AF),
+                                        modifier = Modifier.size(15.dp),
+                                    )
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Saved Contact Scam (Ask Action)", fontSize = 12.sp) },
+                                onClick = {
+                                    showTestMenu = false
+                                    onRunTest("known")
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Outlined.PermContactCalendar,
+                                        contentDescription = null,
+                                        tint = Color(0xFFD97706),
+                                        modifier = Modifier.size(15.dp),
+                                    )
+                                },
                             )
                         }
                     }
-                } else if (active) {
-                    Surface(
-                        onClick = { onRunTest(if (watchChat) "chat" else "sms") },
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFFDCFCE7),
-                        border = BorderStroke(1.dp, Color(0xFF86EFAC)),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(Icons.Outlined.PlayArrow, null, tint = Color(0xFF15803D), modifier = Modifier.size(13.dp))
-                            Spacer(Modifier.width(3.dp))
-                            Text(
-                                text = I18n.t("Test alert", language),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF15803D),
-                            )
-                        }
-                    }
-                } else {
-                    Surface(
-                        onClick = { onRunTest("chat") },
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFFF3F4F6),
-                        border = BorderStroke(1.dp, Color(0xFFD1D5DB)),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(Icons.Outlined.PlayArrow, null, tint = Chaukas.Ink2, modifier = Modifier.size(12.dp))
-                            Spacer(Modifier.width(3.dp))
-                            Text(
-                                text = I18n.t("Test alert", language),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Chaukas.Ink2,
-                            )
-                        }
-                    }
+
+                    Switch(
+                        checked = active,
+                        onCheckedChange = { want ->
+                            if (want) {
+                                if (!watchSms && !watchChat) {
+                                    watchSms = true
+                                    watchChat = true
+                                    Guard.setWatches(ctx, "sms", true)
+                                    Guard.setWatches(ctx, "chat", true)
+                                }
+                                explain = true
+                            } else {
+                                on = false
+                                Guard.setOn(ctx, false)
+                                Guard.stop(ctx)
+                            }
+                        },
+                        modifier = Modifier.scale(0.72f),
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Chaukas.Mint600,
+                            uncheckedThumbColor = Color.White,
+                            uncheckedTrackColor = Color(0xFFD1D5DB),
+                        ),
+                    )
                 }
             }
 
-            // Dedicated Quick-Test Box for WhatsApp and SMS simulation
-            if (active) {
+            // Compact 1-line warning banner if notification access is missing
+            if (on && !access) {
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = Color.White.copy(alpha = 0.85f),
-                    border = BorderStroke(1.dp, Color(0xFFD1FAE5)),
-                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                    onClick = {
+                        Guard.openAccess(ctx)
+                        Guard.forceRebind(ctx)
+                    },
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFFEF3F2),
+                    border = BorderStroke(1.dp, Color(0xFFFECDCA)),
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 10.dp, vertical = 7.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Outlined.NotificationsActive,
-                                contentDescription = null,
-                                tint = Color(0xFF059669),
-                                modifier = Modifier.size(15.dp),
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = I18n.t("Simulate test scam:", language),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF065F46),
-                            )
-                        }
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Surface(
-                                onClick = { onRunTest("chat") },
-                                shape = RoundedCornerShape(6.dp),
-                                color = Color(0xFFE8F5E9),
-                                border = BorderStroke(1.dp, Color(0xFFA5D6A7)),
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Icon(Icons.Outlined.PlayArrow, null, tint = Color(0xFF1B5E20), modifier = Modifier.size(11.dp))
-                                    Spacer(Modifier.width(2.dp))
-                                    Text(
-                                        text = "WhatsApp",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF1B5E20),
-                                    )
-                                }
-                            }
-
-                            Surface(
-                                onClick = { onRunTest("sms") },
-                                shape = RoundedCornerShape(6.dp),
-                                color = Color(0xFFEFF6FF),
-                                border = BorderStroke(1.dp, Color(0xFFBFDBFE)),
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Icon(Icons.Outlined.PlayArrow, null, tint = Color(0xFF1E40AF), modifier = Modifier.size(11.dp))
-                                    Spacer(Modifier.width(2.dp))
-                                    Text(
-                                        text = "SMS",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF1E40AF),
-                                    )
-                                }
-                            }
-
-                            Surface(
-                                onClick = { onRunTest("known") },
-                                shape = RoundedCornerShape(6.dp),
-                                color = Color(0xFFFFF3E0),
-                                border = BorderStroke(1.dp, Color(0xFFFFB74D)),
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Icon(Icons.Outlined.PlayArrow, null, tint = Color(0xFFE65100), modifier = Modifier.size(11.dp))
-                                    Spacer(Modifier.width(2.dp))
-                                    Text(
-                                        text = I18n.t("Saved contact", language),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFE65100),
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (on && !access) {
-                Surface(
-                    onClick = { Guard.openAccess(ctx) },
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFFEF3F2),
-                    border = BorderStroke(1.dp, Color(0xFFFECDCA)),
-                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(30.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFFFEBEE)),
-                            contentAlignment = Alignment.Center,
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f),
                         ) {
                             Icon(
-                                Icons.Outlined.NotificationsActive,
+                                Icons.Outlined.Warning,
                                 contentDescription = null,
-                                tint = Color(0xFFC62828),
-                                modifier = Modifier.size(17.dp),
+                                tint = Color(0xFFB42318),
+                                modifier = Modifier.size(13.dp),
                             )
-                        }
-                        Spacer(Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
+                            Spacer(Modifier.width(5.dp))
                             Text(
-                                text = I18n.t("Notification access needed", language),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
+                                text = I18n.t("Notification access needed to scan WhatsApp", language),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
                                 color = Color(0xFFB42318),
-                            )
-                            Spacer(Modifier.height(1.dp))
-                            Text(
-                                text = I18n.t("Allow Chaukas in system settings to detect WhatsApp and SMS scams", language),
-                                fontSize = 11.sp,
-                                color = Color(0xFF912018),
-                                lineHeight = 14.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        Spacer(Modifier.width(8.dp))
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFFC62828),
+                            shape = RoundedCornerShape(4.dp),
+                            color = Color(0xFFB42318),
                         ) {
                             Text(
                                 text = I18n.t("Enable", language),
-                                fontSize = 11.sp,
+                                fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             )
                         }
                     }
                 }
             }
 
+            // Compact 1-line warning banner if SMS permission is missing
             if (on && watchSms && !hasSmsPermission) {
                 Surface(
                     onClick = { requestSms.launch(Manifest.permission.RECEIVE_SMS) },
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(8.dp),
                     color = Color(0xFFEFF6FF),
                     border = BorderStroke(1.dp, Color(0xFFBFDBFE)),
-                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(30.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFDBEAFE)),
-                            contentAlignment = Alignment.Center,
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f),
                         ) {
                             Icon(
                                 Icons.Outlined.Sms,
                                 contentDescription = null,
-                                tint = Color(0xFF2563EB),
-                                modifier = Modifier.size(17.dp),
+                                tint = Color(0xFF1E40AF),
+                                modifier = Modifier.size(13.dp),
                             )
-                        }
-                        Spacer(Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
+                            Spacer(Modifier.width(5.dp))
                             Text(
-                                text = I18n.t("Allow SMS scan", language),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
+                                text = I18n.t("SMS permission needed to scan text messages", language),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
                                 color = Color(0xFF1E40AF),
-                            )
-                            Spacer(Modifier.height(1.dp))
-                            Text(
-                                text = I18n.t("Grant SMS permission to catch fraud text messages instantly", language),
-                                fontSize = 11.sp,
-                                color = Color(0xFF1D4ED8),
-                                lineHeight = 14.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        Spacer(Modifier.width(8.dp))
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(4.dp),
                             color = Color(0xFF2563EB),
                         ) {
                             Text(
                                 text = I18n.t("Allow", language),
-                                fontSize = 11.sp,
+                                fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (active && isOptimized) {
-                Surface(
-                    onClick = { Guard.requestIgnoreBatteryOptimization(ctx) },
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFFFFBEB),
-                    border = BorderStroke(1.dp, Color(0xFFFDE68A)),
-                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(30.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFFEF3C7)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                Icons.Outlined.Bolt,
-                                contentDescription = null,
-                                tint = Color(0xFFD97706),
-                                modifier = Modifier.size(17.dp),
-                            )
-                        }
-                        Spacer(Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = I18n.t("Keep active when app is closed", language),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF92400E),
-                            )
-                            Spacer(Modifier.height(1.dp))
-                            Text(
-                                text = I18n.t("Allow background run so scam warnings never stop", language),
-                                fontSize = 11.sp,
-                                color = Color(0xFFB45309),
-                                lineHeight = 14.sp,
-                            )
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFFD97706),
-                        ) {
-                            Text(
-                                text = I18n.t("Allow", language),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (active && !hasContactsPermission) {
-                Surface(
-                    onClick = { requestContacts.launch(Manifest.permission.READ_CONTACTS) },
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFEFF6FF),
-                    border = BorderStroke(1.dp, Color(0xFFBFDBFE)),
-                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(30.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFDBEAFE)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                Icons.Outlined.PermContactCalendar,
-                                contentDescription = null,
-                                tint = Color(0xFF2563EB),
-                                modifier = Modifier.size(17.dp),
-                            )
-                        }
-                        Spacer(Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = I18n.t("Identify saved contacts", language),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF1E40AF),
-                            )
-                            Spacer(Modifier.height(1.dp))
-                            Text(
-                                text = I18n.t("Enable Contacts to distinguish friends from unknown numbers", language),
-                                fontSize = 11.sp,
-                                color = Color(0xFF1D4ED8),
-                                lineHeight = 14.sp,
-                            )
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFF2563EB),
-                        ) {
-                            Text(
-                                text = I18n.t("Allow", language),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             )
                         }
                     }
