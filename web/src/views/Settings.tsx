@@ -77,7 +77,7 @@ export function SettingsView() {
         </div>
         {!ON_DEVICE_LANGUAGES.includes(languageCode(s.language)) && (
           <p className="hint" style={{ marginTop: 10 }}>
-            Gemini Nano on your device is tuned for English, Spanish and Japanese. For {s.language}, Smart and Most accurate modes give the best wording; Private mode will try its best.
+            Gemini Nano on your device is tuned for English. For {s.language}, Smart and Most accurate modes give the best wording; Private mode will try its best.
           </p>
         )}
         <div style={{ marginTop: 12 }}>

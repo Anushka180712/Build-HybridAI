@@ -60,18 +60,10 @@ export const LANGUAGES: { name: string; native: string; code: string }[] = [
   { name: 'Tamil', native: 'தமிழ்', code: 'ta' },
   { name: 'Telugu', native: 'తెలుగు', code: 'te' },
   { name: 'Marathi', native: 'मराठी', code: 'mr' },
-  { name: 'Kannada', native: 'ಕನ್ನಡ', code: 'kn' },
-  { name: 'Malayalam', native: 'മലയാളം', code: 'ml' },
-  { name: 'Gujarati', native: 'ગુજરાતી', code: 'gu' },
-  { name: 'Punjabi', native: 'ਪੰਜਾਬੀ', code: 'pa' },
-  { name: 'Spanish', native: 'Español', code: 'es' },
-  { name: 'Japanese', native: '日本語', code: 'ja' },
-  { name: 'French', native: 'Français', code: 'fr' },
-  { name: 'Portuguese', native: 'Português', code: 'pt' },
 ];
 
 /** Output languages Gemini Nano in Chrome is tuned for. */
-export const ON_DEVICE_LANGUAGES = ['en', 'es', 'ja'];
+export const ON_DEVICE_LANGUAGES = ['en'];
 
 export function languageCode(name: string): string {
   return LANGUAGES.find((l) => l.name === name)?.code ?? 'en';
