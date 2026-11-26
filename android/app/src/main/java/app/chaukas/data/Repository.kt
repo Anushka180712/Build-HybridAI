@@ -601,14 +601,15 @@ object Repository {
         if (run.analysis.verdict == Verdict.SAFE || run.analysis.riskScore < SHARE_MIN_RISK) return emptyList()
         val snap = db.collection("circles").whereArrayContains("members", u).get().await()
         if (snap.isEmpty) return emptyList()
-        // Target only the selected / active circle (or first circle if none explicitly set)
-        val activeId = context?.let { getActiveCircleId(it) }
-        val targetDoc = snap.documents.firstOrNull { it.id == activeId } ?: snap.documents.first()
-        val name = targetDoc.getString("name") ?: "Family"
-        runCatching {
-            shareAlert(targetDoc.id, run, "")
+        val sharedNames = mutableListOf<String>()
+        for (doc in snap.documents) {
+            val name = doc.getString("name") ?: "Family"
+            runCatching {
+                shareAlert(doc.id, run, "")
+                sharedNames.add(name)
+            }
         }
-        return listOf(name)
+        return sharedNames
     }
 
     /* ---------------- Remote Config ---------------- */

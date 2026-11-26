@@ -261,10 +261,6 @@ export async function autoShareToCircles(run: AnalysisRun): Promise<string[]> {
   const snap = await getDocs(query(collection(fb.db, 'circles'), where('members', 'array-contains', user.uid)));
   const circles = snap.docs.map((d) => ({ id: d.id, name: String(d.data().name ?? 'Family') }));
   if (circles.length === 0) return [];
-  // Target only the active / selected circle (or first circle), not across all groups
-  const activeId = typeof localStorage !== 'undefined' ? localStorage.getItem('chaukas_active_circle') : null;
-  const target = circles.find((c) => c.id === activeId) || circles[0];
-  if (!target) return [];
-  await shareToCircle(target.id, run, '');
-  return [target.name];
+  const done = await Promise.allSettled(circles.map((c) => shareToCircle(c.id, run, '')));
+  return circles.filter((_, i) => done[i].status === 'fulfilled').map((c) => c.name);
 }

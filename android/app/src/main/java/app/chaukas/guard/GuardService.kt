@@ -613,22 +613,6 @@ object Guard {
             .setContentIntent(pending)
             .setAutoCancel(true)
 
-        // For known contacts, no confusing inline actions on the notification shade:
-        // clicking the notification redirects directly into the app with the complete message and decision buttons.
-        if (!isKnownContact) {
-            // Unknown sender: quick dismiss action
-            val dismissIntent = Intent(ctx, GuardActionReceiver::class.java).apply {
-                putExtra("notification_id", id)
-            }
-            val dismissPending = PendingIntent.getBroadcast(
-                ctx,
-                id + 2,
-                dismissIntent,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-            )
-            builder.addAction(0, "It's okay", dismissPending)
-        }
-
         val notification = builder.build()
         try {
             NotificationManagerCompat.from(ctx).notify(id, notification)
@@ -646,25 +630,38 @@ object Guard {
     fun isSenderKnown(ctx: Context, from: String, title: String = "", person: String = ""): Boolean {
         val hasContacts = ctx.checkSelfPermission(android.Manifest.permission.READ_CONTACTS) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
-        // 1. If any candidate matches an actual contact saved in the phone:
-        if (isContactSaved(ctx, from) ||
-            (title.isNotBlank() && isContactSaved(ctx, title)) ||
-            (person.isNotBlank() && isContactSaved(ctx, person))
-        ) {
-            return true
+        val candidates = listOf(from, title, person).filter { it.isNotBlank() }
+        if (candidates.isEmpty()) return false
+
+        // 1. When contacts permission is granted: phonebook is the definitive source of truth
+        if (hasContacts) {
+            for (c in candidates) {
+                if (isContactSaved(ctx, c)) return true
+            }
+            return false
         }
 
-        // 2. If contacts permission is granted and no match was found, it is definitely not saved:
-        if (hasContacts) return false
-
-        // 3. Fallback heuristic when contacts permission has not been granted:
-        val candidate = when {
-            from.isNotBlank() -> from
-            title.isNotBlank() -> title
-            else -> person
+        // 2. Fallback when contacts permission has NOT been granted:
+        // Any candidate with phone digits, + sign, ~ push name marker, SMS header, or unknown label is strictly UNSAVED.
+        for (c in candidates) {
+            val t = c.trim()
+            if (t.startsWith("~") || t.startsWith("+") || t.any { it.isDigit() } ||
+                Regex("""^[A-Za-z]{2}-[A-Za-z0-9]{3,8}$""").matches(t) ||
+                t.equals("unknown", ignoreCase = true) || t.equals("unknown sender", ignoreCase = true) ||
+                t.equals("unknown number", ignoreCase = true)
+            ) {
+                return false
+            }
         }
-        if (candidate.isBlank()) return false
-        return !MessageGuard.isUnsavedSender(candidate) { isContactSaved(ctx, it) }
+
+        val primary = (if (from.isNotBlank()) from else title).trim()
+        val lower = primary.lowercase()
+        val isGenericService = lower.contains("officer") || lower.contains("support") || lower.contains("care") ||
+            lower.contains("bank") || lower.contains("service") || lower.contains("help") ||
+            lower.contains("info") || lower.contains("alert") || lower.contains("notice") ||
+            lower.contains("telecom") || lower.contains("update") || lower == "whatsapp" || lower == "messages"
+
+        return primary.length in 2..40 && !isGenericService
     }
 
     /**
@@ -672,29 +669,16 @@ object Guard {
      * if READ_CONTACTS permission has been granted. Checks both phone numbers and display names.
      */
     fun isContactSaved(ctx: Context, from: String): Boolean {
-        val clean = from.trim().removePrefix("~").trim()
-        if (clean.isBlank()) return false
+        val trimmed = from.trim()
+        if (trimmed.isBlank()) return false
+        // WhatsApp ~ prefix denotes an unsaved push name, not a saved phonebook entry
+        if (trimmed.startsWith("~")) return false
 
         // Check if READ_CONTACTS permission is granted
         val hasPermission = ctx.checkSelfPermission(android.Manifest.permission.READ_CONTACTS) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        if (!hasPermission) {
-            // When contacts permission is not granted:
-            // In WhatsApp notifications, ONLY saved contacts appear as plain display names (e.g. "Pooja", "Mom")
-            // without phone numbers or ~ prefixes.
-            val hasDigits = clean.any { it.isDigit() }
-            val lower = clean.lowercase()
-            val isGenericService = lower.contains("officer") || lower.contains("support") || lower.contains("care") ||
-                lower.contains("bank") || lower.contains("service") || lower.contains("help") ||
-                lower.contains("info") || lower.contains("alert") || lower.contains("notice") ||
-                lower.contains("telecom") || lower.contains("update")
-            if (!hasDigits && !clean.startsWith("~") && !clean.contains("+") && clean.length in 2..40 &&
-                !clean.equals("unknown", ignoreCase = true) && !clean.equals("unknown sender", ignoreCase = true) &&
-                !Regex("""^[A-Za-z]{2}-[A-Za-z0-9]{3,8}$""").matches(clean) && !isGenericService) {
-                return true
-            }
-            return false
-        }
+        if (!hasPermission) return false
 
+        val clean = trimmed
         // 1. Phone number lookups (both national and international formats)
         val phonePattern = Regex("""(\+?\d[\d -]{7,15}\d)""").find(clean)
         val digits = (phonePattern?.value ?: clean).filter { it.isDigit() }
@@ -732,7 +716,7 @@ object Guard {
                 if (matched) return true
             }
 
-            // C) Direct scan of phone numbers comparing trailing digits (handles arbitrary spacing/hyphens)
+            // C) Direct scan of phone numbers comparing trailing digits
             val cursorScanMatch = runCatching {
                 ctx.contentResolver.query(
                     android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
@@ -755,7 +739,7 @@ object Guard {
             if (cursorScanMatch) return true
         }
 
-        // 2. Contact display name lookup in ContactsContract.Contacts
+        // 2. Contact display name lookup in ContactsContract.Contacts (exact case-insensitive match)
         val nameFound = runCatching {
             ctx.contentResolver.query(
                 android.provider.ContactsContract.Contacts.CONTENT_URI,
@@ -765,18 +749,7 @@ object Guard {
                 null,
             )?.use { it.moveToFirst() } ?: false
         }.getOrDefault(false)
-        if (nameFound) return true
-
-        // 3. Fallback: partial match on display name
-        return runCatching {
-            ctx.contentResolver.query(
-                android.provider.ContactsContract.Contacts.CONTENT_URI,
-                arrayOf(android.provider.ContactsContract.Contacts._ID),
-                "${android.provider.ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} LIKE ?",
-                arrayOf("%$clean%"),
-                null,
-            )?.use { it.moveToFirst() } ?: false
-        }.getOrDefault(false)
+        return nameFound
     }
 
     /**

@@ -411,7 +411,7 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
         saveRun(r)
         Repository.saveCheck(r)
         isSavedToHistory = true
-        if (r.analysis.verdict != Verdict.SAFE && r.analysis.riskScore >= 65) {
+        if (r.analysis.verdict != Verdict.SAFE) {
             viewModelScope.launch {
                 runCatching { Repository.autoShareToCircles(r) }
             }
