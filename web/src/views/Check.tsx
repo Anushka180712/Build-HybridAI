@@ -105,7 +105,7 @@ export function CheckView() {
     saveRun(toSave);
     setSavedToHistory(true);
     toast(t('Added to history'), 'check');
-    if (!isKnownContact) {
+    if (toSave.analysis.verdict !== 'safe') {
       autoShareToCircles(toSave).then((names) => names.length && toast(`${t('Shared with')} ${names.join(', ')}`), () => undefined);
     }
   };

@@ -244,11 +244,8 @@ fun ChaukasRoot(vm: ChaukasViewModel) {
                                     // Mark as scam button
                                     Button(
                                         onClick = {
-                                            val textToAssess = if (!alert.text.isNullOrBlank()) alert.text else alert.message
-                                            vm.text = textToAssess
                                             tab = Tab.CHECK
-                                            vm.check(isKnown = true, fromSender = alert.from.orEmpty(), autoShare = true)
-                                            vm.dismissInAppAlert()
+                                            vm.markAlertAsScam(alert)
                                             Toast.makeText(
                                                 ctx,
                                                 I18n.t("Marked as scam and shared to circle & history", vm.language),

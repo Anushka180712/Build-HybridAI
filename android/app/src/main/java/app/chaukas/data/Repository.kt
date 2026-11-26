@@ -570,7 +570,7 @@ object Repository {
     }
 
     suspend fun shareAlert(circleId: String, run: AnalysisRun, note: String) {
-        val u = uid ?: error("Sign in first")
+        val u = uid ?: auth.currentUser?.uid ?: runCatching { ensureAuth() }.getOrNull()?.uid ?: error("Sign in first")
         db.collection("circles").document(circleId).collection("alerts").add(
             mapOf(
                 "byUid" to u,
@@ -598,9 +598,9 @@ object Repository {
     suspend fun autoShareToCircles(run: AnalysisRun, context: Context? = null): List<String> {
         val user = runCatching { ensureAuth(context) }.getOrNull()
         val u = user?.uid ?: uid ?: return emptyList()
-        if (run.analysis.verdict == Verdict.SAFE || run.analysis.riskScore < SHARE_MIN_RISK) return emptyList()
-        val snap = db.collection("circles").whereArrayContains("members", u).get().await()
-        if (snap.isEmpty) return emptyList()
+        if (run.analysis.verdict == Verdict.SAFE) return emptyList()
+        val snap = runCatching { db.collection("circles").whereArrayContains("members", u).get().await() }.getOrNull()
+        if (snap == null || snap.isEmpty) return emptyList()
         val sharedNames = mutableListOf<String>()
         for (doc in snap.documents) {
             val name = doc.getString("name") ?: "Family"

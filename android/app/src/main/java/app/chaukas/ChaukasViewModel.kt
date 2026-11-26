@@ -407,15 +407,65 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
 
     fun saveCurrentRunToHistory() {
         val r = run ?: return
-        if (isSavedToHistory) return
         saveRun(r)
-        Repository.saveCheck(r)
         isSavedToHistory = true
-        if (r.analysis.verdict != Verdict.SAFE) {
-            viewModelScope.launch {
-                runCatching { Repository.autoShareToCircles(r) }
-            }
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { Repository.saveCheck(r) }
+            runCatching { Repository.autoShareToCircles(r, getApplication()) }
         }
+    }
+
+    fun markAlertAsScam(alert: InAppAlert) {
+        val messageText = alert.text?.ifBlank { null } ?: alert.message
+        val sender = alert.from.orEmpty()
+        val reasons = if (alert.title.isNotBlank() && alert.title != "Suspicious message") {
+            listOf(alert.title)
+        } else {
+            listOf("Suspicious message from known contact")
+        }
+        val redFlags = reasons.map { r ->
+            RedFlag(
+                label = r,
+                evidence = app.chaukas.data.excerpt(messageText, 60),
+                why = "Reported by user as fraud: $r",
+            )
+        }
+        val score = maxOf(alert.score ?: 85, 75)
+        val newRun = AnalysisRun(
+            id = java.util.UUID.randomUUID().toString(),
+            createdAt = System.currentTimeMillis(),
+            input = messageText,
+            analysis = Analysis(
+                verdict = Verdict.SCAM,
+                riskScore = score,
+                category = "phishing",
+                summary = "Marked as scam: ${reasons.first()}",
+                redFlags = redFlags,
+                nextSteps = listOf(
+                    "Do not click any links or call numbers provided in this message.",
+                    "Never share OTP, passwords, UPI PIN, or bank card details.",
+                    "Verify directly with the sender through an alternate channel.",
+                ),
+                safeReply = "I will not share any sensitive information or click any links.",
+            ),
+            source = Source.ON_DEVICE,
+            latencyMs = 8L,
+            redactions = 0,
+        )
+
+        text = messageText
+        isKnownContact = alert.isKnownContact
+        senderName = sender
+        run = newRun
+        saveRun(newRun)
+        isSavedToHistory = true
+
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { Repository.saveCheck(newRun) }
+            runCatching { Repository.autoShareToCircles(newRun, getApplication()) }
+        }
+
+        dismissInAppAlert()
     }
 
     fun speakRun(r: AnalysisRun) {
