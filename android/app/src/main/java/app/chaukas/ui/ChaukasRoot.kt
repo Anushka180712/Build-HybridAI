@@ -143,6 +143,7 @@ fun ChaukasRoot(vm: ChaukasViewModel) {
 
             // Pretty in-app notification banner when an alert arrives while app is in foreground
             vm.inAppAlert?.let { alert ->
+                val ctx = LocalContext.current
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -165,68 +166,138 @@ fun ChaukasRoot(vm: ChaukasViewModel) {
                         border = BorderStroke(1.dp, if (alert.isScam) Color(0xFFE53935) else Color(0xFF2F8F6B)),
                         shadowElevation = 10.dp,
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(if (alert.isScam) Color(0xFFFFEBEE) else Color(0xFFE8F5E9)),
-                                contentAlignment = Alignment.Center,
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Icon(
-                                    if (alert.isScam) Icons.Outlined.WarningAmber else Icons.Outlined.Shield,
-                                    null,
-                                    tint = if (alert.isScam) Color(0xFFC62828) else Color(0xFF2E7D32),
-                                    modifier = Modifier.size(22.dp),
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(if (alert.isScam) Color(0xFFFFEBEE) else Color(0xFFE8F5E9)),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        if (alert.isScam) Icons.Outlined.WarningAmber else Icons.Outlined.Shield,
+                                        null,
+                                        tint = if (alert.isScam) Color(0xFFC62828) else Color(0xFF2E7D32),
+                                        modifier = Modifier.size(22.dp),
+                                    )
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = if (alert.isScam) Color(0xFFC62828) else Color(0xFF2E7D32),
+                                        ) {
+                                            Text(
+                                                if (alert.isScam) "SCAM ALERT ${alert.score ?: 85}%" else "CHECKED SAFE",
+                                                color = Color.White,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                            )
+                                        }
+                                        if (!alert.from.isNullOrBlank()) {
+                                            Spacer(Modifier.width(6.dp))
+                                            Text(alert.from, color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        }
+                                    }
+                                    Spacer(Modifier.height(3.dp))
+                                    Text(
+                                        alert.title,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        alert.message,
+                                        color = Color.White.copy(alpha = 0.85f),
+                                        fontSize = 12.sp,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                IconButton(
+                                    onClick = { vm.dismissInAppAlert() },
+                                    modifier = Modifier.size(28.dp),
+                                ) {
+                                    Icon(Icons.Outlined.Close, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+                                }
                             }
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = if (alert.isScam) Color(0xFFC62828) else Color(0xFF2E7D32),
+
+                            // Two action buttons for known numbers / messages
+                            if (alert.isKnownContact) {
+                                Spacer(Modifier.height(10.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    // Mark as scam button
+                                    Button(
+                                        onClick = {
+                                            val textToAssess = if (!alert.text.isNullOrBlank()) alert.text else alert.message
+                                            vm.text = textToAssess
+                                            tab = Tab.CHECK
+                                            vm.check(isKnown = true, fromSender = alert.from.orEmpty(), autoShare = true)
+                                            vm.dismissInAppAlert()
+                                            Toast.makeText(
+                                                ctx,
+                                                I18n.t("Marked as scam and shared to circle & history", vm.language),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color(0xFFC62828),
+                                            contentColor = Color.White,
+                                        ),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f).height(38.dp),
                                     ) {
+                                        Icon(Icons.Outlined.Warning, null, modifier = Modifier.size(15.dp))
+                                        Spacer(Modifier.width(6.dp))
                                         Text(
-                                            if (alert.isScam) "SCAM ALERT ${alert.score ?: 85}%" else "CHECKED SAFE",
-                                            color = Color.White,
-                                            fontSize = 10.sp,
+                                            text = I18n.t("Mark as scam", vm.language),
                                             fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                            fontSize = 12.sp,
                                         )
                                     }
-                                    if (!alert.from.isNullOrBlank()) {
+
+                                    // It's okay button
+                                    OutlinedButton(
+                                        onClick = {
+                                            vm.dismissInAppAlert()
+                                            Toast.makeText(
+                                                ctx,
+                                                I18n.t("Dismissed", vm.language),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        },
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = Color.White,
+                                        ),
+                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f).height(38.dp),
+                                    ) {
+                                        Icon(Icons.Outlined.CheckCircle, null, modifier = Modifier.size(15.dp), tint = Color(0xFF81C784))
                                         Spacer(Modifier.width(6.dp))
-                                        Text(alert.from, color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(
+                                            text = I18n.t("It's okay", vm.language),
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 12.sp,
+                                            color = Color.White,
+                                        )
                                     }
                                 }
-                                Spacer(Modifier.height(3.dp))
-                                Text(
-                                    alert.title,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Spacer(Modifier.height(2.dp))
-                                Text(
-                                    alert.message,
-                                    color = Color.White.copy(alpha = 0.85f),
-                                    fontSize = 12.sp,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                            Spacer(Modifier.width(8.dp))
-                            IconButton(
-                                onClick = { vm.dismissInAppAlert() },
-                                modifier = Modifier.size(28.dp),
-                            ) {
-                                Icon(Icons.Outlined.Close, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
                             }
                         }
                     }

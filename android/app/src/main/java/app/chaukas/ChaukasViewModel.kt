@@ -333,7 +333,7 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
                 } else {
                     val r = engine.analyze(text, mode, redact, emptyList(), language)
                     run = r
-                    if ((autoShare || !effectiveIsKnown) && r.analysis.verdict != Verdict.SAFE && r.analysis.riskScore >= 65) {
+                    if ((autoShare || !effectiveIsKnown) && r.analysis.verdict != Verdict.SAFE && (autoShare || r.analysis.riskScore >= 65)) {
                         saveCurrentRunToHistory()
                     } else {
                         isSavedToHistory = false
