@@ -195,7 +195,7 @@ fun ChaukasRoot(vm: ChaukasViewModel) {
                                             color = if (alert.isScam) Color(0xFFC62828) else Color(0xFF2E7D32),
                                         ) {
                                             Text(
-                                                if (alert.isScam) "SCAM ALERT ${alert.score ?: 85}%" else "CHECKED SAFE",
+                                                if (alert.isScam) "${I18n.t("SCAM ALERT", vm.language)} ${alert.score ?: 85}%" else I18n.t("CHECKED SAFE", vm.language),
                                                 color = Color.White,
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold,
@@ -209,7 +209,7 @@ fun ChaukasRoot(vm: ChaukasViewModel) {
                                     }
                                     Spacer(Modifier.height(3.dp))
                                     Text(
-                                        alert.title,
+                                        I18n.t(alert.title, vm.language),
                                         color = Color.White,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp,
@@ -3550,7 +3550,7 @@ private fun AutoScanToggleBar(language: String = "English") {
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = "WhatsApp",
+                            text = I18n.t("WhatsApp", language),
                             fontSize = 12.sp,
                             fontWeight = if (watchChat && on) FontWeight.Bold else FontWeight.Medium,
                             color = if (watchChat && on && access) Color(0xFF15803D) else Chaukas.Ink,
@@ -3608,7 +3608,7 @@ private fun AutoScanToggleBar(language: String = "English") {
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = "SMS",
+                            text = I18n.t("SMS", language),
                             fontSize = 12.sp,
                             fontWeight = if (watchSms && on) FontWeight.Bold else FontWeight.Medium,
                             color = if (watchSms && on && access) Color(0xFF15803D) else Chaukas.Ink,
@@ -3663,7 +3663,7 @@ private fun AutoScanToggleBar(language: String = "English") {
                             color = if (active) Color(0xFFDCFCE7) else Color(0xFFF3F4F6),
                         ) {
                             Text(
-                                text = "Try ▾",
+                                text = I18n.t("Try ▾", language),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (active) Color(0xFF15803D) else Chaukas.Ink2,
@@ -3678,7 +3678,7 @@ private fun AutoScanToggleBar(language: String = "English") {
                     onDismissRequest = { showTestMenu = false },
                 ) {
                     DropdownMenuItem(
-                        text = { Text("WhatsApp Scam (Unknown Sender)", fontSize = 12.sp) },
+                        text = { Text(I18n.t("WhatsApp Scam (Unknown Sender)", language), fontSize = 12.sp) },
                         onClick = {
                             showTestMenu = false
                             onRunTest("chat")
@@ -3693,7 +3693,7 @@ private fun AutoScanToggleBar(language: String = "English") {
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("SMS Scam (Unknown Sender)", fontSize = 12.sp) },
+                        text = { Text(I18n.t("SMS Scam (Unknown Sender)", language), fontSize = 12.sp) },
                         onClick = {
                             showTestMenu = false
                             onRunTest("sms")
@@ -3708,7 +3708,7 @@ private fun AutoScanToggleBar(language: String = "English") {
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("Saved Contact Scam (Ask Action)", fontSize = 12.sp) },
+                        text = { Text(I18n.t("Saved Contact Scam (Ask Action)", language), fontSize = 12.sp) },
                         onClick = {
                             showTestMenu = false
                             onRunTest("known")

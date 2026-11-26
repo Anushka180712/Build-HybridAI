@@ -27,6 +27,7 @@ import app.chaukas.ai.Source
 import app.chaukas.ai.Verdict
 import app.chaukas.data.HistoryCounts
 import app.chaukas.data.HistoryState
+import app.chaukas.data.I18n
 import app.chaukas.data.InviteUtils
 import app.chaukas.data.LocalHistory
 import app.chaukas.data.QrFinding
@@ -122,7 +123,11 @@ class ChaukasViewModel(app: Application) : AndroidViewModel(app) {
         Guard.onAlertCallback = { alert, appName, isKnown ->
             viewModelScope.launch(Dispatchers.Main) {
                 showInAppAlert(
-                    title = if (isKnown) "Suspicious message from ${alert.from}" else (alert.reasons.firstOrNull() ?: "Scam alert"),
+                    title = if (isKnown) {
+                        "${I18n.t("Suspicious message from", language)} ${alert.from}"
+                    } else {
+                        alert.reasons.firstOrNull()?.let { I18n.t(it, language) } ?: I18n.t("Scam alert", language)
+                    },
                     message = alert.text,
                     score = alert.score,
                     from = if (alert.from.isNotBlank()) alert.from else appName,
